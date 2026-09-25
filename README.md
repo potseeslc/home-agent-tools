@@ -8,6 +8,8 @@ An open-source, self-hosted connection manager for AI agents.
 
 Planning and evaluation. There is no installable application or production release yet. Features described below are planned, not implemented. We are evaluating existing MCP gateways before choosing the implementation foundation.
 
+A [connection evaluation](evaluation/README.md) now provides pinned ContextForge and Gitea MCP containers, Pocket ID configuration, a Home Assistant availability probe, and verification steps. This trial is separate from the planned application UI.
+
 ## Vision
 
 Home Agent Tools aims to provide a management website and authenticated MCP interface for:
