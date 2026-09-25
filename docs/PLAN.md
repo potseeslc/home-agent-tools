@@ -20,7 +20,7 @@ Logging into an AI runtime does not automatically authorize it to the hub. Each 
 
 ## Multi-user accounts
 
-Support individual user accounts, Owner/Admin/Member/Viewer roles, personal service connections, and explicit shared access. Agents act under verified user or service identities. Track both the initiating principal and the upstream account used; do not imply that shared credentials preserve upstream user identity. See [Accounts and access](ACCOUNTS-AND-ACCESS.md).
+Support individual user accounts, Owner/Admin/Member/Viewer roles, personal upstream connections, and shared integration definitions. Agents act under verified user or service identities. The upstream service must authorize the user's own connected account and apply its access level. Hub grants can narrow access, never expand it. Shared-account execution is outside the first release. See [Accounts and access](ACCOUNTS-AND-ACCESS.md).
 
 ## Delivery approach
 
@@ -40,7 +40,7 @@ Build custom adapters, context features, or UI only where a demonstrated gap war
 ## MVP acceptance
 
 - Two users connecting the same service cannot access each other's credentials, private results, or requests.
-- Shared actions retain initiating-user and agent attribution while identifying the upstream account actually used.
+- Upstream identity checks identify each user's connected account, and account-specific permission denials remain enforced. No shared/admin credential fallback is allowed.
 
 - Direct tool calls cannot bypass authorization or target restrictions.
 - Disabling one enrollment blocks subsequent calls independently of token expiry.

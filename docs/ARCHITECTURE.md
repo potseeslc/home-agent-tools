@@ -16,7 +16,7 @@ flowchart TD
 
 ## Accounts and ownership
 
-Multiple users may connect separate accounts to the same service. Connections are personal by default; shared use requires explicit grants. Each request identifies its initiating principal, agent enrollment, workspace, and the upstream credential account. See [Accounts and access](ACCOUNTS-AND-ACCESS.md) for roles, isolation, and attribution requirements.
+Multiple users may connect separate accounts to the same service. Every user links their own upstream account; shared integration definitions never share user credentials. Upstream authorization must represent that account and its permissions, not merely record the user locally. Shared-account execution is outside the first release. Each request identifies its initiating principal, agent enrollment, workspace, and the upstream credential account. See [Accounts and access](ACCOUNTS-AND-ACCESS.md) for roles, isolation, and attribution requirements.
 
 ## Three authentication boundaries
 

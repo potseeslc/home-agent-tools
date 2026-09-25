@@ -10,7 +10,7 @@ Show the signed-in account, active workspace, and the identity an agent acts for
 
 ## Switchboard
 
-The default home screen separates My connections from Shared with me, showing connection owner, upstream account label when verified, connection health, and available tools. Service cards lead to connection details and relevant reconnect actions. Keep connection health separate from an agent's permission to use that connection.
+The default home screen separates My connections from Available services, showing connection owner, upstream account label when verified, connection health, and available tools. Service cards lead to connection details and relevant reconnect actions. Keep connection health separate from an agent's permission to use that connection.
 
 Agents, activity, and shared context remain accessible through navigation. Requests have a dedicated inbox rather than being buried in service configuration.
 
@@ -26,9 +26,11 @@ Provide the same request-review experience in a responsive phone layout. Priorit
 
 ## Guided Setup for administrators and connection owners
 
-Admin flow: choose service → enter connection details → authenticate → verify connected account → test connection → select exposed tools → review ownership/sharing → assign agent access → finish.
+Admin service-registration flow: choose integration → configure endpoint and provider application details → select allowed tools → set member eligibility → finish. Registering a service does not authorize it as every member.
 
-Member flow: choose an approved service → connect a personal account → verify identity and test → review personal visibility → assign owned agents access within policy. Members cannot register arbitrary service endpoints.
+Each administrator also uses the personal account-linking flow to connect their own upstream account.
+
+Personal account-linking flow: choose an approved service → connect a personal account → verify identity and test → review connected account and granted permissions → assign owned agents access within policy. Members cannot register arbitrary service endpoints.
 
 Adapt authentication steps to the integration's actual mechanism. Pocket ID authenticates the administrator to the hub; service authentication may use OAuth, an API credential, or an existing connection. Do not assume every service has a browser OAuth flow.
 
