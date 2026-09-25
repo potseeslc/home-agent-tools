@@ -43,8 +43,10 @@ For each candidate, record release/commit, license, enabled edition/features, de
 7. Load a private Gitea skill, update its revision, and observe client behavior.
 8. Inspect encryption, audit redaction, and backup restoration.
 
-Also evaluate the [multi-user account requirements](ACCOUNTS-AND-ACCESS.md): per-user upstream connections, role boundaries, shared definitions without shared credentials, cache isolation, reconnect identity changes, and initiating-user versus upstream-account attribution. Generic multi-tenancy claims are not sufficient evidence.
+Also evaluate the [multi-user account requirements](ACCOUNTS-AND-ACCESS.md): per-user upstream connections, role boundaries, personal connections and explicitly scoped shared service connections, cache isolation, reconnect identity changes, and initiating-user versus upstream-account attribution. Generic multi-tenancy claims are not sufficient evidence.
 
 Prefer configuration and small adapters over a deep fork. Choose a custom gateway only when measured gaps justify its maintenance cost. No candidate is selected yet.
 
-**Mandatory personal-identity gate:** connect the same provider with two users and verify each upstream account identity plus a real difference in service permissions. Reject fallback to a shared/admin credential. A gateway that records user identity only in its own audit trail does not satisfy this requirement.
+**Personal-identity mode gate:** connect the same provider with two users and verify each upstream account identity plus a real difference in service permissions. Reject fallback to a shared/admin credential. A gateway that records user identity only in its own audit trail does not satisfy this requirement.
+
+**Shared-connection mode gate:** use an explicitly configured shared account with different hub grants for two users. Confirm target restrictions, no access to raw credentials, per-user/agent audit attribution, and no fallback from a failed personal connection. In both modes, test upstream account permissions, connection scopes, and hub grants independently.

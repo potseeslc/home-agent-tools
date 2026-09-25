@@ -20,7 +20,7 @@ Logging into an AI runtime does not automatically authorize it to the hub. Each 
 
 ## Multi-user accounts
 
-Support individual user accounts, Owner/Admin/Member/Viewer roles, personal upstream connections, and shared integration definitions. Agents act under verified user or service identities. The upstream service must authorize the user's own connected account and apply its access level. Hub grants can narrow access, never expand it. Shared-account execution is outside the first release. See [Accounts and access](ACCOUNTS-AND-ACCESS.md).
+Support individual user accounts, Owner/Admin/Member/Viewer roles, personal upstream connections, and shared integration definitions. Agents act under verified user or service identities. Support Personal account and explicitly granted Shared service connection modes. The upstream sees the personal or shared credential identity respectively; hub activity always attributes the initiating user and agent. Effective access is the intersection of upstream account permissions, connection authorization, and hub permissions. See [Accounts and access](ACCOUNTS-AND-ACCESS.md).
 
 ## Delivery approach
 
@@ -50,6 +50,8 @@ Build custom adapters, context features, or UI only where a demonstrated gap war
 - Cached facts identify source, observation time, and staleness.
 - Private Git context can be updated and pinned to a reviewed revision.
 - Backup restoration recovers encrypted connection state with a separately protected key.
+
+The MVP also tests a shared connection with two differently permitted users: unauthorized tools/targets must fail before execution, and activity must distinguish the caller from the shared upstream account.
 
 ## Scope boundaries
 

@@ -13,7 +13,8 @@ Planning and evaluation. There is no installable application or production relea
 Home Agent Tools aims to provide a management website and authenticated MCP interface for:
 
 - Service connections, OAuth refresh, connection health, and reconnect flows.
-- Personal upstream accounts: agents use each user's own service identity and permissions.
+- Personal upstream accounts and explicitly granted shared service connections, with clear identity and activity attribution.
+- Access bounded by service account permissions, connection authorization, and user/agent grants.
 - Individually enrolled agents with scoped access and revocation.
 - Shared skills, operating instructions, and context from Git repositories, including self-hosted Gitea.
 - Pocket ID integration, with standards-based identity boundaries.

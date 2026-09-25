@@ -16,7 +16,7 @@ flowchart TD
 
 ## Accounts and ownership
 
-Multiple users may connect separate accounts to the same service. Every user links their own upstream account; shared integration definitions never share user credentials. Upstream authorization must represent that account and its permissions, not merely record the user locally. Shared-account execution is outside the first release. Each request identifies its initiating principal, agent enrollment, workspace, and the upstream credential account. See [Accounts and access](ACCOUNTS-AND-ACCESS.md) for roles, isolation, and attribution requirements.
+Users can link personal upstream accounts; administrators can also configure explicitly shared service connections. Personal mode preserves the user's upstream identity. Shared mode identifies the caller in hub activity while the upstream sees the shared account. Never silently substitute shared credentials for a personal login. Each call must satisfy upstream account permissions, connection authorization, and hub user/agent grants. See [Accounts and access](ACCOUNTS-AND-ACCESS.md) for ownership, isolation, and attribution requirements.
 
 ## Three authentication boundaries
 

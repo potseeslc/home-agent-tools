@@ -14,6 +14,10 @@ The default home screen separates My connections from Available services, showin
 
 Agents, activity, and shared context remain accessible through navigation. Requests have a dedicated inbox rather than being buried in service configuration.
 
+Connection details expose three separate fields: **Connected account**, **Connection access**, and **This agent’s access**. Label unknown upstream permissions **Not verified**, with a verification date where available. Identify the blocking layer when a request is denied and the cause is known.
+
+Label connections **Personal account** or **Shared service connection**. The latter is visible only to granted users and identifies the shared upstream account without revealing credentials. Administrator setup can configure shared service accounts explicitly; personal connection failures never switch to this mode automatically.
+
 ## Request Inbox
 
 Collect agent access requests, reconnect needs, and requests for services that are not configured yet. Each request identifies the requesting user and agent, service, credential owner, requested capabilities, and the action needed from the authorized reviewer.
