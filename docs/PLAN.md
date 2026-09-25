@@ -4,10 +4,13 @@ Draft, September 25, 2026. This is a public design proposal, not deployed functi
 
 ## User experience
 
-The dashboard has four areas:
+The selected design combines a **Switchboard**, **Request Inbox**, and **Pocket Remote**, with **Guided Setup** for administrators. See the [UI decision](UI-DESIGN.md) for screens, chat handoff, and prototype acceptance.
+
+The dashboard includes these functional areas:
 
 | Area | Purpose |
 |---|---|
+| Requests | Review access requests, reconnect needs, and new-service requests |
 | Connections | Connect services; show health, login requirements, last successful checks, and reconnect actions |
 | Agents | Enroll runtimes, assign access, and disable individual enrollments |
 | Activity | Explain which client called which tool and the result, with redacted audit records |
