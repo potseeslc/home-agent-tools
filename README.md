@@ -24,6 +24,7 @@ Initial integration targets are UniFi, Home Assistant, and Gitea. The architectu
 
 - [Product plan and roadmap](docs/PLAN.md)
 - [Selected UI direction](docs/UI-DESIGN.md)
+- [Accounts, ownership, and access levels](docs/ACCOUNTS-AND-ACCESS.md)
 - [Architecture and Pocket ID](docs/ARCHITECTURE.md)
 - [Existing gateway evaluation](docs/GATEWAY-EVALUATION.md)
 - [Security design](docs/SECURITY-DESIGN.md)

@@ -18,6 +18,10 @@ The dashboard includes these functional areas:
 
 Logging into an AI runtime does not automatically authorize it to the hub. Each client needs enrollment. Providers may revoke upstream access and require reauthentication. The hub persists connection state; it need not hold network sockets open indefinitely.
 
+## Multi-user accounts
+
+Support individual user accounts, Owner/Admin/Member/Viewer roles, personal service connections, and explicit shared access. Agents act under verified user or service identities. Track both the initiating principal and the upstream account used; do not imply that shared credentials preserve upstream user identity. See [Accounts and access](ACCOUNTS-AND-ACCESS.md).
+
 ## Delivery approach
 
 Evaluate ContextForge and Obot before committing to a custom gateway. Reuse existing components if their behavior and deployment model meet the acceptance criteria. Keep the Home Agent Tools name for the resulting service, preserving upstream licensing and attribution. The language and database are provisional until this decision is made.
@@ -34,6 +38,9 @@ Build custom adapters, context features, or UI only where a demonstrated gap war
 6. **Broader compatibility:** publish tested runtime configurations and expand integrations based on actual use.
 
 ## MVP acceptance
+
+- Two users connecting the same service cannot access each other's credentials, private results, or requests.
+- Shared actions retain initiating-user and agent attribution while identifying the upstream account actually used.
 
 - Direct tool calls cannot bypass authorization or target restrictions.
 - Disabling one enrollment blocks subsequent calls independently of token expiry.

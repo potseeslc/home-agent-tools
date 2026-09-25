@@ -43,4 +43,6 @@ For each candidate, record release/commit, license, enabled edition/features, de
 7. Load a private Gitea skill, update its revision, and observe client behavior.
 8. Inspect encryption, audit redaction, and backup restoration.
 
+Also evaluate the [multi-user account requirements](ACCOUNTS-AND-ACCESS.md): per-user upstream connections, role boundaries, explicit sharing, cache isolation, reconnect identity changes, and initiating-user versus upstream-account attribution. Generic multi-tenancy claims are not sufficient evidence.
+
 Prefer configuration and small adapters over a deep fork. Choose a custom gateway only when measured gaps justify its maintenance cost. No candidate is selected yet.

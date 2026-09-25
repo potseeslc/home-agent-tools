@@ -4,15 +4,19 @@ Accepted September 25, 2026. Design decision only; these screens are not impleme
 
 The interface combines concepts 1 (Switchboard), 3 (Request Inbox), and 8 (Pocket Remote), with concept 7 (Guided Setup) for service administrators.
 
+## Accounts throughout the interface
+
+Show the signed-in account, active workspace, and the identity an agent acts for. Keep connection ownership, access level, and health distinct. The [account and access model](ACCOUNTS-AND-ACCESS.md) governs every screen.
+
 ## Switchboard
 
-The default home screen shows configured services, connection health, and available tools. Service cards lead to connection details and relevant reconnect actions. Keep connection health separate from an agent's permission to use that connection.
+The default home screen separates My connections from Shared with me, showing connection owner, upstream account label when verified, connection health, and available tools. Service cards lead to connection details and relevant reconnect actions. Keep connection health separate from an agent's permission to use that connection.
 
 Agents, activity, and shared context remain accessible through navigation. Requests have a dedicated inbox rather than being buried in service configuration.
 
 ## Request Inbox
 
-Collect agent access requests, reconnect needs, and requests for services that are not configured yet. Each request identifies the requesting agent, service, requested capabilities, and the action needed from the user.
+Collect agent access requests, reconnect needs, and requests for services that are not configured yet. Each request identifies the requesting user and agent, service, credential owner, requested capabilities, and the action needed from the authorized reviewer.
 
 Distinguish reconnecting an existing service from granting agent access. Neither action should silently expand the other. Show pending, resolved, denied, and expired states. Users may act only on requests they are authorized to manage.
 
@@ -20,9 +24,11 @@ Distinguish reconnecting an existing service from granting agent access. Neither
 
 Provide the same request-review experience in a responsive phone layout. Prioritize a readable request summary, requested access, and a clear next action. This is a mobile presentation of the shared application, not a separate app or permission system.
 
-## Guided Setup for administrators
+## Guided Setup for administrators and connection owners
 
-Flow: choose service → enter connection details → authenticate → test connection → select exposed tools → assign agent access → finish.
+Admin flow: choose service → enter connection details → authenticate → verify connected account → test connection → select exposed tools → review ownership/sharing → assign agent access → finish.
+
+Member flow: choose an approved service → connect a personal account → verify identity and test → review personal visibility → assign owned agents access within policy. Members cannot register arbitrary service endpoints.
 
 Adapt authentication steps to the integration's actual mechanism. Pocket ID authenticates the administrator to the hub; service authentication may use OAuth, an API credential, or an existing connection. Do not assume every service has a browser OAuth flow.
 
@@ -45,7 +51,8 @@ Do not put credentials into request URLs or chat. Expired, denied, or unresolved
 - The default screen uses service cards and distinguishes login failure from denied agent access.
 - One request can be followed from chat through review and back to a successful simulated read.
 - A new-service request leads an administrator through all setup stages.
-- A non-admin cannot add a service through a direct request link.
+- A non-admin cannot register a new service endpoint through a direct request link, but may connect a personal account to an approved service within policy.
+- Request and connection views distinguish the initiating user/agent from the upstream credential account.
 - The same request can be reviewed on desktop and phone without changing its scope.
 - Denial, expiry, authentication failure, test failure, and return-to-chat states are represented.
 

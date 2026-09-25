@@ -14,6 +14,10 @@ flowchart TD
     MCP --> Context[Reviewed Git-backed context]
 ```
 
+## Accounts and ownership
+
+Multiple users may connect separate accounts to the same service. Connections are personal by default; shared use requires explicit grants. Each request identifies its initiating principal, agent enrollment, workspace, and the upstream credential account. See [Accounts and access](ACCOUNTS-AND-ACCESS.md) for roles, isolation, and attribution requirements.
+
 ## Three authentication boundaries
 
 1. **Human to dashboard:** Pocket ID OIDC login. Map identity by verified issuer and subject, not email. Restrict eligibility explicitly; identity-provider administrator status does not automatically grant hub administrator access.
