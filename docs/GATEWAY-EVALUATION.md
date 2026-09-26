@@ -1,6 +1,6 @@
 # Existing gateway evaluation
 
-Research snapshot: September 25, 2026. Documentation review only; neither candidate has been installed or tested by this project. Documentation across versions may disagree. Select a release and verify code and behavior before choosing a foundation.
+Research snapshot: September 25, 2026. ContextForge now has an isolated [live evaluation](../evaluation/RESULTS.md); Obot remains a documentation review. Documentation across versions may disagree. Verify code and behavior before choosing a foundation.
 
 | Requirement | Obot | ContextForge |
 |---|---|---|

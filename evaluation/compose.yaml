@@ -1,0 +1,47 @@
+name: home-agent-tools-evaluation
+services:
+  volume-init:
+    image: ghcr.io/ibm/mcp-context-forge@sha256:5903d660a89f95f70f98c24c0493d1783c0585663c99ba9a8cc9acafa3cb0f65
+    user: "0:0"
+    entrypoint: ["chown", "10001:10001", "/app/data"]
+    volumes: ["gateway-data:/app/data"]
+    network_mode: none
+    restart: "no"
+  gateway:
+    # ContextForge v1.0.7-20260921
+    image: ghcr.io/ibm/mcp-context-forge@sha256:5903d660a89f95f70f98c24c0493d1783c0585663c99ba9a8cc9acafa3cb0f65
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+    env_file: ["${GATEWAY_ENV_FILE:?Set a private gateway env file}"]
+    ports: ["127.0.0.1:4444:4444"]
+    volumes: ["gateway-data:/app/data"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 2g
+    cpus: 2
+    restart: unless-stopped
+    networks:
+      evaluation:
+  gitea:
+    # Official Gitea MCP v1.7.0; no stored token or fallback account.
+    image: docker.gitea.com/gitea-mcp-server@sha256:273827c5cf8fec3846c09bd35461b59bdd06941bdcfcfefd388cbc22f2343f6b
+    # The upstream image uses CMD-SHELL but contains no /bin/sh.
+    healthcheck:
+      test: ["CMD", "/app/gitea-mcp", "-healthcheck"]
+    command: ["/app/gitea-mcp", "-t", "http", "-H", "${GITEA_URL:?Set your Gitea HTTPS URL}", "-r", "-O", "get_me,list_my_repos"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 1
+    restart: unless-stopped
+    networks:
+      evaluation:
+        ipv4_address: ${GITEA_ADAPTER_IP:-172.30.240.2}
+networks:
+  evaluation:
+    ipam:
+      config:
+        - subnet: ${EVALUATION_SUBNET:-172.30.240.0/29}
+volumes:
+  gateway-data:

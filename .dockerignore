@@ -1,0 +1,10 @@
+.git
+.venv
+.pytest_cache
+__pycache__
+*.sqlite*
+*.db*
+.env*
+secrets
+private
+output

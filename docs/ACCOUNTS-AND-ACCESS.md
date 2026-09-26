@@ -1,5 +1,7 @@
 # Accounts, connection ownership, and access levels
 
+> Implementation status: a single-operator application preview now exists. See [what is implemented and how to run it](PREVIEW.md). This document also describes future capabilities and is not a release claim.
+
 Product requirement accepted September 25, 2026. Design only; not yet implemented.
 
 Home Agent Tools supports personal upstream accounts and explicitly configured shared service connections. Personal connections preserve the user's upstream account identity where supported. Shared connections preserve initiating-user and agent accountability in the hub while the upstream sees the shared credential account. These modes must be labeled distinctly; neither may silently substitute for the other.

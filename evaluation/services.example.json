@@ -1,0 +1,18 @@
+{
+  "home_assistant": {
+    "mode": "shared",
+    "url": "http://homeassistant.example.com:8123/api/",
+    "token_file": "/private/path/ha-token",
+    "tools": ["ha_api_status"]
+  },
+  "gitea": {
+    "mode": "personal",
+    "mcp_url": "http://gitea:8080/mcp",
+    "authorization_url": "https://git.example.com/login/oauth/authorize",
+    "token_url": "https://git.example.com/login/oauth/access_token",
+    "redirect_uri": "http://localhost:4444/oauth/callback",
+    "scopes": ["read:user", "read:repository"],
+    "tools": ["get_me", "list_my_repos"],
+    "client_credentials_file": "/private/path/gitea-oauth.json"
+  }
+}

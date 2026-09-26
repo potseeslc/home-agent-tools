@@ -1,0 +1,354 @@
+const $ = (s) => document.querySelector(s);
+const esc = (v) =>
+  String(v ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ],
+  );
+let data = null,
+  view = "switchboard",
+  busy = false;
+const icons = {
+  switchboard: "◫",
+  agents: "⌘",
+  requests: "↗",
+  activity: "≋",
+  gitea: "⌥",
+  homeassistant: "⌂",
+};
+const when = (t) =>
+  !t
+    ? "Never checked"
+    : new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(t * 1000));
+const status = (c) =>
+  !c.configured
+    ? "Setup needed"
+    : c.status === "connected"
+      ? "Connected"
+      : c.status === "needs_attention"
+        ? "Needs attention"
+        : "Ready to verify";
+const identity = (c) => {
+  try {
+    return JSON.parse(c.identity)?.login || "Not verified";
+  } catch {
+    return "Not verified";
+  }
+};
+const pending = () =>
+  data.requests.filter(
+    (r) => r.status === "pending" && r.expires > Date.now() / 1000,
+  );
+function toast(message, error = false) {
+  const t = $("#toast");
+  t.textContent = message;
+  t.className = `show ${error ? "error" : ""}`;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (t.className = ""), 6000);
+}
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(data ? { "X-HAT-CSRF": data.csrf } : {}),
+      ...options.headers,
+    },
+  });
+  let result = {};
+  try {
+    result = await response.json();
+  } catch {}
+  if (!response.ok) {
+    if (response.status === 401) {
+      data = null;
+      renderLogin();
+    }
+    throw new Error(
+      typeof result.detail === "string"
+        ? result.detail
+        : "This action could not be completed. Please try again.",
+    );
+  }
+  return result;
+}
+async function refresh() {
+  data = await api("/api/bootstrap");
+  render();
+}
+function renderLogin() {
+  $("#app").innerHTML =
+    `<main class="login"><div class="login-brand"><img src="/static/mark.svg" alt="" width="46"><span>home agent tools</span><span class="tag">EARLY ACCESS</span></div><div class="login-layout"><section><p class="eyebrow">YOUR HOME. YOUR ACCOUNTS. YOUR AGENTS.</p><h1>A place for<br>everything<br>to connect.</h1><p class="intro">Bring your tools together. Know who’s connected.<br>Stay in control of what every agent can do.</p><a class="button primary login-button" href="/login">Sign in with Pocket ID <span>↗</span></a><p class="fine">Passkey sign-in · Self-hosted · Private by default</p>${new URLSearchParams(location.search).get("login") === "failed" ? '<p class="notice error">Sign-in did not complete. Please try again.</p>' : ""}</section><section class="login-board" aria-label="Your connection switchboard"><div class="wire wire-a"></div><div class="wire wire-b"></div><div class="floating-node n1"><span class="service-icon">⌂</span> Your home</div><div class="floating-node n2"><span class="service-icon">⌥</span> Your accounts</div><div class="center-node"><img src="/static/mark.svg" width="52" alt=""><strong>One connection.<br>Your rules.</strong><span>HOME AGENT TOOLS</span></div><div class="floating-node n3"><span class="dot"></span> Your AI agents</div><p class="board-note">A little less setup.<br>A lot more clarity.</p></section></div><footer>Built for a home that runs on your terms.<span>Self-hosted preview · v0.1</span></footer></main>`;
+}
+function navItem(id, label) {
+  return `<button class="nav-item ${view === id ? "active" : ""}" data-view="${id}" ${view === id ? 'aria-current="page"' : ""}><span class="nav-icon">${icons[id]}</span>${label}${id === "requests" && pending().length ? `<b class="count">${pending().length}</b>` : ""}</button>`;
+}
+function render() {
+  if (!data) return renderLogin();
+  const connected = data.connections.filter(
+    (c) => c.status === "connected",
+  ).length;
+  $("#app").innerHTML =
+    `<div class="shell"><aside class="sidebar"><a class="brand" href="/"><img src="/static/mark.svg" width="36" alt=""><span>home agent<br><b>tools</b></span></a><div class="workspace"><span class="workspace-icon">⌂</span><div><strong>My home</strong><small>Private workspace</small></div><span class="tiny-dot"></span></div><nav aria-label="Main navigation">${navItem("switchboard", "Switchboard")}${navItem("agents", "Agents")}${navItem("requests", "Requests")}${navItem("activity", "Activity")}</nav><div class="sidebar-bottom"><div class="preview-label"><span class="dot"></span> LOCAL PREVIEW</div><p>Your connections stay<br>on your infrastructure.</p><a href="https://github.com/potseeslc/home-agent-tools" target="_blank" rel="noopener noreferrer">Project & documentation ↗</a></div><button class="profile" data-action="account"><span class="avatar">${esc(data.user.name.slice(0, 1))}</span><span><strong>${esc(data.user.name)}</strong><small>${data.user.admin ? "Owner" : "Member"} · Pocket ID</small></span><span>···</span></button></aside><main class="main"><header class="topbar"><span>HOME / <b>${esc(view.toUpperCase())}</b></span><div><span class="live-dot"></span> Your private workspace <span class="version">v0.1</span><button class="mobile-account" data-action="account" aria-label="Your account">···</button></div></header>${view === "switchboard" ? switchboard(connected) : view === "agents" ? agents() : view === "requests" ? requests() : activity()}<footer class="main-footer"><span><span class="tiny-dot"></span> Credentials stay in the connection engine</span><span>Made for your home, on your terms.</span></footer></main></div>`;
+  bind();
+  const params = new URLSearchParams(location.search);
+  if (params.has("connection")) {
+    toast(
+      params.get("connection") === "verify"
+        ? "Authorization received. Run Verify connection to confirm your account."
+        : "Connection did not complete. Try reconnecting.",
+      params.get("connection") !== "verify",
+    );
+    history.replaceState({}, "", location.pathname);
+  }
+}
+function heading(kicker, title, description, button = "") {
+  return `<section class="page-heading"><div><p class="eyebrow">${kicker}</p><h1>${title}</h1><p class="subheading">${description}</p></div>${button}</section>`;
+}
+function switchboard(connected) {
+  return `${heading("EVERYTHING, IN ITS PLACE.", "Your switchboard.", "A clear view of the services your agents can use.", data.user.admin ? '<button class="button primary" data-action="setup">＋ Set up a connection</button>' : "")}<section class="summary-band"><div><span class="summary-number">${String(connected).padStart(2, "0")}</span><div><strong>verified connections</strong><small>Checked against the actual service</small></div></div><div><span class="summary-number">${String(data.agents.filter((a) => a.active && a.expires > Date.now() / 1000).length).padStart(2, "0")}</span><div><strong>active agents</strong><small>Each with its own access</small></div></div><button data-view="requests" class="summary-link"><span class="summary-number">${String(pending().length).padStart(2, "0")}</span><div><strong>need your attention</strong><small>${pending().length ? "Connection requests to review" : "A quiet inbox. Just how it should be."}</small></div><span>↗</span></button></section><section><div class="section-title"><h2>My connections <span>${data.connections.length}</span></h2><span class="muted">Access is granted per agent</span></div><div class="connections">${data.connections.map(card).join("")}</div></section><section class="next-step"><div class="step-mark">↗</div><div><p class="eyebrow">THE NEXT SMALL STEP</p><h2>${data.agents.length ? "A connection is only half the story." : "Give your first agent a place to plug in."}</h2><p>Choose its services, set an expiry, and copy one connection token.<br>You can revoke its access whenever you need to.</p></div><button class="button" data-action="enroll">Connect an agent <span>→</span></button></section><div class="footnote"><span>ⓘ</span><p><strong>Honest about access.</strong> Gitea uses your personal account. Home Assistant uses an explicitly shared credential. Successful login does not imply full service permissions.</p></div>`;
+}
+function card(c) {
+  return `<article class="connection-card"><div class="card-head"><span class="service-icon ${c.id}">${icons[c.id]}</span><span class="status ${c.status === "connected" ? "good" : c.status === "needs_attention" ? "warn" : ""}"><i></i>${status(c)}</span></div><h2>${esc(c.name)}</h2><p class="card-description">${esc(c.description)}</p><div class="account-line"><span>${c.mode === "personal" ? "PERSONAL ACCOUNT" : "SHARED CONNECTION"}</span><strong>${c.mode === "personal" ? esc(identity(c)) : "Home Assistant token owner"}</strong></div><dl class="card-details"><div><dt>Connection access</dt><dd>${c.mode === "personal" ? "Read user & repositories" : "Availability check only"}</dd></div><div><dt>Agent access</dt><dd>Only when explicitly granted</dd></div></dl><div class="card-bottom"><span>${c.checked ? "Checked " + when(c.checked) : "Account verification pending"}</span><button class="text-button" data-detail="${c.id}">Manage ↗</button></div></article>`;
+}
+function agents() {
+  return `${heading("A SEPARATE KEY FOR EVERY AGENT.", "Your agents.", "Give each runtime just the tools it needs. Take access back in one click.", '<button class="button primary" data-action="enroll">＋ Connect an agent</button>')}<div class="notice">Use one enrollment per runtime. Tokens work only at this app’s MCP endpoint; upstream credentials never leave the server.</div>${data.agents.length ? `<div class="list-panel">${data.agents.map((a) => `<article class="agent-row"><span class="agent-icon">⌘</span><div class="agent-info"><h3>${esc(a.name)}</h3><p>${a.services.map((s) => esc(data.connections.find((c) => c.id === s)?.name || s)).join(" · ")} <span class="tag">READ ONLY</span></p></div><div class="agent-date"><strong>${a.active && a.expires > Date.now() / 1000 ? "Expires " + when(a.expires) : "Access disabled"}</strong><small>${a.last_used ? "Last used " + when(a.last_used) : "Not used yet"}</small></div>${a.active && a.expires > Date.now() / 1000 ? `<button class="button small danger" data-revoke="${a.id}">Revoke access</button>` : '<span class="status">Inactive</span>'}</article>`).join("")}</div>` : empty("⌘", "No agents connected yet.", "Start with one runtime. Choose its services and give it a separate token.", '<button class="button" data-action="enroll">Connect your first agent →</button>')}<section class="help-panel"><h2>Works with clients that accept a remote MCP URL and bearer token.</h2><p>Copy the endpoint and token into your runtime’s MCP settings. OAuth-only hosted clients need a separate compatibility step; we won’t mark them supported until they’ve been tested.</p><code>${esc(data.mcp_url)}</code></section>`;
+}
+function requests() {
+  const items = data.requests;
+  return `${heading("KEEP THE HUMAN IN THE LOOP.", "Your request inbox.", "Reconnect a service, verify its account, then send your agent on its way.")}<div class="notice">A request link is not permission. Only its signed-in owner can resolve it, and resolving never expands an agent’s grants.</div>${
+    items.length
+      ? `<div class="list-panel">${items
+          .map((r) => {
+            const expired = r.expires < Date.now() / 1000;
+            return `<article class="request-row ${new URLSearchParams(location.search).get("request") === r.id ? "highlight" : ""}"><span class="agent-icon">↗</span><div class="agent-info"><p class="eyebrow">${esc(r.agent)} REQUESTED</p><h3>Check ${esc(data.connections.find((c) => c.id === r.service)?.name || r.service)}</h3><p>${when(r.created)} · ${expired ? "Expired" : r.status === "resolved" ? "Resolved" : "Waiting for your connection check"}</p></div>${!expired && r.status === "pending" ? `<button class="button" data-detail="${r.service}">Review connection</button><button class="text-button" data-resolve="${r.id}">Mark resolved</button>` : `<span class="status ${r.status === "resolved" ? "good" : ""}">${expired ? "Expired" : "Resolved"}</span>`}</article>`;
+          })
+          .join("")}</div>`
+      : empty(
+          "↗",
+          "Nothing waiting on you.",
+          "When an agent needs a connection, its request will land here. You stay in control.",
+        )
+  }<section class="help-panel"><h2>From chat to connection, without sharing a password.</h2><p>Your agent calls <code>home_agent_request_connection</code> and receives a link to this inbox. You sign in, review the service, and finish any authorization in your browser. Then return to chat and ask the agent to retry.</p></section>`;
+}
+function activity() {
+  return `${heading("A RECORD, WITHOUT THE SECRETS.", "What happened.", "See which agent used which service, and whether its request succeeded.")}<div class="notice">Activity covers calls through Home Agent Tools. We store the actor, action and outcome—not tool arguments, results, or credentials. Retention: 30 days.</div>${data.events.length ? `<div class="activity-table"><div class="activity-head"><span>ACTOR / ACTION</span><span>SERVICE</span><span>OUTCOME</span><span>WHEN</span></div>${data.events.map((e) => `<div class="activity-row"><div><strong>${esc(e.actor)}</strong><small>${esc(e.action.replaceAll(".", " / "))}</small></div><span>${esc(data.connections.find((c) => c.id === e.service)?.name || "Workspace")}</span><span class="status ${e.outcome === "success" ? "good" : "warn"}">${esc(e.outcome)}</span><span class="muted">${when(e.at)}</span></div>`).join("")}</div>` : empty("≋", "A fresh page.", "Connection checks, agent enrollments, and tool calls will appear here.")}`;
+}
+function empty(icon, title, copy, button = "") {
+  return `<section class="empty"><span>${icon}</span><h2>${title}</h2><p>${copy}</p>${button}</section>`;
+}
+function modal(title, body, wide = false) {
+  $("#modal-root").innerHTML =
+    `<div class="modal-shade"><section role="dialog" aria-modal="true" aria-label="${esc(title)}" class="modal ${wide ? "wide" : ""}"><header><p class="eyebrow">HOME AGENT TOOLS</p><button class="close" aria-label="Close dialog">×</button></header><h2>${title}</h2>${body}</section></div>`;
+  $(".close").onclick = closeModal;
+  $(".modal-shade").onclick = (e) => {
+    if (e.target.classList.contains("modal-shade")) closeModal();
+  };
+  $(".close").focus();
+  bindModal();
+}
+function closeModal() {
+  $("#modal-root").innerHTML = "";
+}
+function bind() {
+  document.querySelectorAll("[data-view]").forEach(
+    (el) =>
+      (el.onclick = () => {
+        view = el.dataset.view;
+        render();
+      }),
+  );
+  document
+    .querySelectorAll("[data-detail]")
+    .forEach((el) => (el.onclick = () => details(el.dataset.detail)));
+  document
+    .querySelectorAll("[data-action]")
+    .forEach(
+      (el) =>
+        (el.onclick = () =>
+          ({ enroll: enrollForm, setup: () => setup(1), account: account })[
+            el.dataset.action
+          ]()),
+    );
+  document
+    .querySelectorAll("[data-revoke]")
+    .forEach((el) => (el.onclick = () => revoke(el.dataset.revoke)));
+  document.querySelectorAll("[data-resolve]").forEach(
+    (el) =>
+      (el.onclick = () =>
+        run(async () => {
+          await api(`/api/requests/${el.dataset.resolve}/resolve`, {
+            method: "POST",
+          });
+          await refresh();
+          toast("Request resolved. Your agent can retry.");
+        })),
+  );
+}
+function bindModal() {
+  document.querySelectorAll("[data-reconnect]").forEach(
+    (el) =>
+      (el.onclick = () =>
+        run(async () => {
+          const result = await api("/api/connections/gitea/connect", {
+            method: "POST",
+          });
+          location.assign(result.url);
+        })),
+  );
+  document.querySelectorAll("[data-check]").forEach(
+    (el) =>
+      (el.onclick = () =>
+        run(async () => {
+          el.disabled = true;
+          el.textContent = "Checking…";
+          try {
+            const r = await api(`/api/connections/${el.dataset.check}/test`, {
+              method: "POST",
+            });
+            await refresh();
+            details(el.dataset.check);
+            toast(r.message, !r.ok);
+          } finally {
+            el.disabled = false;
+          }
+        })),
+  );
+}
+async function run(fn) {
+  if (busy) return;
+  busy = true;
+  try {
+    await fn();
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    busy = false;
+  }
+}
+function details(id) {
+  const c = data.connections.find((c) => c.id === id);
+  modal(
+    `${esc(c.name)} connection`,
+    `<div class="detail-status"><span class="status ${c.status === "connected" ? "good" : ""}"><i></i>${status(c)}</span><span class="tag">${c.mode === "personal" ? "PERSONAL" : "SHARED"}</span></div><p class="modal-copy">${c.mode === "personal" ? "Calls use your own Gitea authorization. If it expires, reconnect your account here. There is no fallback account. Reconnecting pauses agents with Gitea access; verify the account and enroll them again." : "This connection uses a shared Home Assistant credential. The service sees its token owner; this app records the requesting agent."}</p><div class="permission-layers"><div><b>01</b><section><small>CONNECTED ACCOUNT</small><strong>${c.mode === "personal" ? esc(identity(c)) : "Shared token owner"}</strong><p>Upstream account permissions: not fully verified</p></section></div><div><b>02</b><section><small>CONNECTION ACCESS</small><strong>${c.mode === "personal" ? "Read user and repositories" : "Fixed availability endpoint"}</strong><p>${c.mode === "personal" ? "Requested scopes: read:user, read:repository" : "The underlying token may have broader access."}</p></section></div><div><b>03</b><section><small>THIS APP’S AGENT ACCESS</small><strong>Explicit grants · Read tools only</strong><p>Connecting a service does not grant every agent access.</p></section></div></div><p class="fine">${c.checked ? "Last verified " + when(c.checked) : "Run a check to verify this connection."}</p><div class="modal-actions"><button class="button primary" data-check="${id}">Verify connection ↗</button>${id === "gitea" ? '<button class="button" data-reconnect>Reconnect account</button>' : ""}</div>`,
+  );
+}
+function enrollForm() {
+  modal(
+    "Give an agent its own key.",
+    `<p class="modal-copy">Choose what this runtime may use. Start small; you can revoke this enrollment independently.</p><form id="enroll-form"><label>Agent name<input name="name" maxlength="60" placeholder="e.g. My desktop assistant" required autocomplete="off"></label><fieldset><legend>Allowed connections</legend>${data.connections.map((c) => `<label class="check-card"><input type="checkbox" name="services" value="${c.id}" ${c.status !== "connected" ? "disabled" : ""}><span><strong>${esc(c.name)}</strong><small>${c.status === "connected" ? c.description : "Verify this connection first"}</small></span><span class="tag">READ</span></label>`).join("")}</fieldset><label>Access expires<select name="days"><option value="1">In 24 hours</option><option value="7" selected>In 7 days</option><option value="30">In 30 days</option></select></label><div class="modal-actions"><button class="button primary" type="submit">Create agent connection →</button></div></form>`,
+  );
+  $("#enroll-form").onsubmit = (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    const services = form.getAll("services");
+    if (!services.length)
+      return toast("Select at least one verified connection.", true);
+    run(async () => {
+      const result = await api("/api/agents", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.get("name"),
+          days: Number(form.get("days")),
+          services,
+        }),
+      });
+      await refresh();
+      modal(
+        "Your agent’s connection is ready.",
+        `<div class="notice">Copy this token now. It is shown once. Treat it like a password and store it in your runtime’s secret settings.</div><label>MCP endpoint<input readonly id="endpoint" value="${esc(result.url)}"></label><label>Bearer token<textarea readonly id="new-token" rows="4" spellcheck="false">${esc(result.token)}</textarea></label><div class="modal-actions"><button class="button primary" id="copy-token">Copy token</button><button class="button" id="done">I’ve saved it</button></div><p class="fine">Use Streamable HTTP with an Authorization: Bearer header. Never paste the token into chat or a repository.</p>`,
+      );
+      $("#copy-token").onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(result.token);
+          toast("Token copied. Store it in your runtime’s secret settings.");
+        } catch {
+          $("#new-token").select();
+          toast("Select and copy the token from this field.");
+        }
+      };
+      $("#done").onclick = () => {
+        closeModal();
+        view = "agents";
+        render();
+      };
+    });
+  };
+}
+function revoke(id) {
+  const a = data.agents.find((a) => a.id === id);
+  modal(
+    "Revoke this agent’s access?",
+    `<p class="modal-copy"><strong>${esc(a.name)}</strong> will lose access to its tools on the next call. Your service connections and other agents remain available.</p><div class="modal-actions"><button class="button danger" id="confirm-revoke">Revoke access</button><button class="button" id="cancel">Keep connected</button></div>`,
+  );
+  $("#cancel").onclick = closeModal;
+  $("#confirm-revoke").onclick = () =>
+    run(async () => {
+      const r = await api("/api/agents/" + id, { method: "DELETE" });
+      closeModal();
+      await refresh();
+      toast(
+        r.upstream_revoked
+          ? "Agent access revoked."
+          : "Access blocked locally. Upstream revocation needs another check.",
+      );
+    });
+}
+function setup(step = 1, selected = "gitea") {
+  const c = data.connections.find((c) => c.id === selected);
+  modal(
+    "A little setup. A clear connection.",
+    `<div class="steps"><span class="${step === 1 ? "current" : ""}">01 Choose</span><span class="${step === 2 ? "current" : ""}">02 Review</span><span class="${step === 3 ? "current" : ""}">03 Connect</span></div>${step === 1 ? `<p class="modal-copy">Start with an integration approved for this installation. Credentials and endpoints are configured privately by the service administrator.</p><div class="service-options">${data.connections.map((s) => `<button class="service-option ${s.id === selected ? "selected" : ""}" data-select="${s.id}"><span class="service-icon ${s.id}">${icons[s.id]}</span><span><strong>${esc(s.name)}</strong><small>${s.mode === "personal" ? "Connect your own account" : "Use the approved shared connection"}</small></span><span>→</span></button>`).join("")}</div><div class="notice">UniFi and custom integrations are planned. This preview enables only the two reviewed service definitions.</div>` : step === 2 ? `<p class="modal-copy">You’re setting up <strong>${esc(c.name)}</strong>. Here is exactly what this connection will offer.</p><div class="review-box"><span class="tag">${c.mode.toUpperCase()} CONNECTION</span><h3>${c.mode === "personal" ? "Your account, your permissions." : "A shared credential, clearly labeled."}</h3><p>${esc(c.description)}</p><ul><li>Only the listed read tools are exposed.</li><li>Each agent needs a separate, explicit grant.</li><li>${c.mode === "personal" ? "You approve access on Gitea’s own consent screen." : "The upstream service sees the shared token owner."}</li></ul></div>` : `<p class="modal-copy">${c.mode === "personal" ? "Open the provider’s sign-in page, review the read scopes, and return here to verify your account." : "The shared credential is already configured on the server. Run a check to confirm that the service is reachable."}</p><div class="review-box"><h3>${esc(c.name)}</h3><p>${status(c)}</p>${c.mode === "personal" ? '<button class="button primary" data-reconnect>Connect with Gitea ↗</button>' : ""}<button class="button ${c.mode === "shared" ? "primary" : ""}" data-check="${c.id}">Verify connection ↗</button></div><p class="fine">No passwords or upstream tokens are entered into this walkthrough.</p>`}<div class="modal-actions">${step > 1 ? '<button class="button" id="back-step">← Back</button>' : ""}${step < 3 ? '<button class="button primary" id="next-step">Continue →</button>' : '<button class="button" id="finish-setup">Back to switchboard</button>'}</div>`,
+  );
+  document
+    .querySelectorAll("[data-select]")
+    .forEach((el) => (el.onclick = () => setup(1, el.dataset.select)));
+  if ($("#next-step"))
+    $("#next-step").onclick = () => setup(step + 1, selected);
+  if ($("#back-step"))
+    $("#back-step").onclick = () => setup(step - 1, selected);
+  if ($("#finish-setup")) $("#finish-setup").onclick = closeModal;
+}
+function account() {
+  modal(
+    "Your workspace.",
+    `<p class="modal-copy">Signed in as <strong>${esc(data.user.name)}</strong> through Pocket ID. This preview is restricted to explicitly enabled accounts.</p><div class="notice">Signing out of this dashboard does not revoke your enrolled agents. Manage those separately under Agents.</div><div class="modal-actions"><button class="button" id="signout">Sign out</button></div>`,
+  );
+  $("#signout").onclick = () =>
+    run(async () => {
+      await api("/api/logout", { method: "POST" });
+      closeModal();
+      data = null;
+      renderLogin();
+    });
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModal();
+  if (e.key === "Tab" && $(".modal")) {
+    const list = [
+      ...$(".modal").querySelectorAll("a,button,input,textarea,select"),
+    ].filter((x) => !x.disabled);
+    const first = list[0],
+      last = list.at(-1);
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
+if (new URLSearchParams(location.search).has("request")) view = "requests";
+refresh().catch((e) => {
+  renderLogin();
+  if (!e.message.includes("Sign in")) toast(e.message, true);
+});

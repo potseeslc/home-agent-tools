@@ -13,3 +13,7 @@ node_modules/
 dist/
 __pycache__/
 .DS_Store
+.venv/
+.pytest_cache/
+.coverage
+*.egg-info/

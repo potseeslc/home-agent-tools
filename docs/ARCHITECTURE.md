@@ -1,5 +1,7 @@
 # Architecture and Pocket ID
 
+> Implementation status: a single-operator application preview now exists. See [what is implemented and how to run it](PREVIEW.md). This document also describes future capabilities and is not a release claim.
+
 Proposed design; no components have been deployed by this project.
 
 ```mermaid
