@@ -4,10 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "home-agent-tools"
-version = "0.1.0"
+version = "0.2.0"
 description = "A personal connection switchboard for AI agents"
 requires-python = ">=3.12"
-dependencies = ["fastapi==0.141.1", "uvicorn==0.54.0", "httpx==0.28.1", "jsonschema==4.26.0"]
+dependencies = ["fastapi==0.141.1", "uvicorn==0.54.0", "httpx==0.28.1", "jsonschema==4.26.0", "cryptography==50.0.1", "websockets==15.0.1"]
+
+[project.scripts]
+home-agent-tools = "home_agent_tools.cli:main"
 
 [project.optional-dependencies]
 test = ["pytest==9.1.1", "pytest-asyncio==1.4.0", "mcp==2.2.0"]

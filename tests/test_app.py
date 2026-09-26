@@ -152,6 +152,7 @@ async def setup(tmp_path):
         "a" * 40,
         frozenset({"alice", "bob"}),
         str(tmp_path / "state.sqlite"),
+        ha_shared_preview=True,
     )
     app = create_app(cfg, httpx.MockTransport(broker))
     async with httpx.AsyncClient(

@@ -1,5 +1,7 @@
 # Architecture and Pocket ID
 
+> Implementation status: see [the v0.2 connector guide](CONNECTOR.md) and [preview limits](PREVIEW.md). This document also describes planned capabilities.
+
 > Implementation status: a single-operator application preview now exists. See [what is implemented and how to run it](PREVIEW.md). This document also describes future capabilities and is not a release claim.
 
 Proposed design; no components have been deployed by this project.

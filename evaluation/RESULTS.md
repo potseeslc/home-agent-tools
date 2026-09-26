@@ -34,3 +34,9 @@ The evaluation and first application preview ran on an ARM64 Docker host, reache
 **Identity and scopes:** the broker still maps SSO accounts by verified email. The app's UUID allowlist does not solve upstream issuer/subject binding. Gitea requested `read:user read:repository`, but its stored token scopes were empty; successful read calls do not prove the full effective permission set. Home Assistant uses a borrowed shared token whose underlying permissions may exceed the one exposed tool. Keep the preview restricted to its operator.
 
 The implemented UI, runtime endpoint, installation contract, operational limits, and remaining release gates are described in [the preview guide](../docs/PREVIEW.md). No upstream issue or security report has been submitted as part of this work.
+
+## Browser connector increment — 2026-09-26
+
+Version 0.2 adds fixed 30/90-day per-agent browser approvals, S256 PKCE, rotating short-lived access credentials, a macOS/Linux installer and stdio bridge, and personal Home Assistant authorization stored in the encrypted app vault. ContextForge continues to broker Pocket ID and Gitea. See [the connector guide](../docs/CONNECTOR.md) for the exact limits.
+
+Validation: 26 automated tests passed, including a real loopback HTTP callback and subprocess stdio client using simulated upstream identity/consent; refresh replay, fixed expiry, ownership, encrypted storage, configuration preservation, and renewal failure behavior. The preview image was built and the CLI installed locally. Real Home Assistant consent and the first browser-authorized Codex enrollment remain pending the operator's sign-in; automated tests are not evidence that those live steps succeeded.

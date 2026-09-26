@@ -1,4 +1,4 @@
-"""Small local control store. Never stores upstream or agent bearer credentials."""
+"""Local control store. Credential material is hashed or stored in the encrypted vault."""
 
 import json
 import sqlite3
@@ -30,6 +30,24 @@ class State:
             CREATE TABLE IF NOT EXISTS requests (
               id TEXT PRIMARY KEY, owner TEXT NOT NULL, agent TEXT NOT NULL,
               service TEXT NOT NULL, status TEXT NOT NULL, created REAL NOT NULL, expires REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS secrets (
+              kind TEXT NOT NULL, owner TEXT NOT NULL, encrypted TEXT NOT NULL,
+              PRIMARY KEY(kind,owner));
+            CREATE TABLE IF NOT EXISTS oauth_clients (
+              id TEXT PRIMARY KEY, name TEXT NOT NULL, redirects TEXT NOT NULL, created REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS authorizations (
+              id TEXT PRIMARY KEY, client TEXT NOT NULL, redirect TEXT NOT NULL,
+              state TEXT NOT NULL, challenge TEXT NOT NULL, services TEXT NOT NULL,
+              days INTEGER NOT NULL, owner TEXT, status TEXT NOT NULL, expires REAL NOT NULL,
+              code_hash TEXT, agent TEXT);
+            CREATE TABLE IF NOT EXISTS access_tokens (
+              hash TEXT PRIMARY KEY, agent TEXT NOT NULL, expires REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS refresh_tokens (
+              hash TEXT PRIMARY KEY, agent TEXT NOT NULL, client TEXT NOT NULL,
+              consumed INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS ha_states (
+              hash TEXT PRIMARY KEY, owner TEXT NOT NULL, binding TEXT NOT NULL,
+              expires REAL NOT NULL);
             """
             )
 

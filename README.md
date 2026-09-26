@@ -6,11 +6,11 @@ An open-source, self-hosted connection manager for AI agents.
 
 ## Project status
 
-**Usable single-operator preview.** The repository now contains the Home Agent Tools web app: Pocket ID sign-in, a personal Gitea connection, an explicitly shared Home Assistant status check, guided connection review, scoped agent enrollment, revocation, a request inbox, and redacted activity.
+**Single-operator preview, v0.2.** Home Agent Tools now includes a one-command local installer, Pocket ID-backed browser approval for agents, a fixed 30/90-day access lifecycle, and personal Home Assistant authorization. The web app provides a switchboard, connection setup, per-agent grants and revocation, request inbox, and activity.
 
-The app uses ContextForge as an internal credential broker. This is not yet a general-purpose or multi-tenant release. A pre-provisioned broker workspace is required; UniFi, arbitrary service setup, role management, hosted OAuth-client compatibility, and skill distribution remain future work.
+Start with [the installer and browser connection guide](docs/CONNECTOR.md). For server provisioning, see [the deployment guide](docs/PREVIEW.md). The internal ContextForge broker and explicit operator allowlist are still required. This is not a general multi-tenant or hosted-client release.
 
-See [installation, runtime connection, and limitations](docs/PREVIEW.md), [live verification results](evaluation/RESULTS.md), and the [connection evaluation](evaluation/README.md). Runtime dependencies and container images are pinned. No service credentials belong in this repository.
+Codex and macOS Claude Desktop configuration adapters are included. OAuth and stdio behavior are tested; actual provider consent and product-specific compatibility must be verified separately. UniFi, arbitrary service setup, role administration, and skill distribution remain future work. Credentials stay outside Git.
 
 ## Vision
 
