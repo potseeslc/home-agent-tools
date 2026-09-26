@@ -412,7 +412,8 @@ def setup(args):
             )
             try:
                 check_profile(profile)
-                private_write(profile_path, json.dumps(profile))
+                with profile_lock(profile_path):
+                    private_write(profile_path, json.dumps(profile))
             except Exception:
                 request(
                     server + "/oauth/revoke",
