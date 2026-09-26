@@ -1,5 +1,7 @@
 # Security design
 
+> Implementation status: a single-operator application preview now exists. See [what is implemented and how to run it](PREVIEW.md). This document also describes future capabilities and is not a release claim.
+
 These are requirements for implementation, not claims about an existing application.
 
 - Start with read-only, individually enrolled clients. Enforce permissions on every call, including direct calls to tools omitted from discovery.

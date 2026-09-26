@@ -1,31 +1,36 @@
 # Live evaluation — September 25, 2026
 
-The trial ran on an ARM64 Docker host using the image digests in `compose.yaml`, provisioned with isolated Docker commands and accessed through a loopback SSH tunnel. The Compose template passed configuration validation; it has not been separately deployed. No production household container was replaced. Private host addresses, identities, and credentials are excluded from this record.
+The evaluation and first application preview ran on an ARM64 Docker host, reached through a localhost SSH tunnel. Images were pinned by digest. Existing household services were not replaced. Private addresses, identities, and credentials are excluded here.
 
 | Check | Observed result |
 |---|---|
-| Gateway startup and health | HTTP 200; database persisted across restart |
-| Pocket ID registration | Dedicated confidential client; dedicated group with one evaluator; PKCE and consent enabled; readback verified |
-| Pocket ID authorization initiation | Correct issuer redirect, exact registered callback, S256 PKCE |
-| Pocket ID completed browser login | Pending evaluator interaction; not verified |
-| Home Assistant through MCP | Scoped token discovered the single availability tool and received `API running.` from fixed GET `/api/` |
-| Anonymous gateway tool execution | HTTP 401 |
-| Gitea adapter | Exactly `get_me` and `list_my_repos` exposed; read-only flag enabled; no stored upstream token |
-| Gitea without a credential | `get_me` returned an MCP error result; no shared-account fallback |
-| Gitea OAuth initiation | Dedicated application; redirect requests `read:user read:repository` with S256 PKCE |
-| Gitea consent, identity and repository access | Pending evaluator consent; gateway tool discovery remains empty |
-| Untyped/extra tool arguments | **Failed:** `additionalProperties=false` did not reject an extra argument, including with `EXPERIMENTAL_VALIDATE_IO=true` |
-| Private resources without a team after restart | **Failed:** tool, gateway, and virtual server became public |
-| Explicit team assignment and private visibility after restart | Passed for all three resources; HA call remained available through its scoped token |
-| Two actual agent runtimes | Not tested; an HTTP MCP probe is not two runtimes |
-| Refresh, revocation, two-user upstream permissions | Not tested |
+| Pocket ID | Dedicated restricted client, PKCE and consent; operator completed login; app sign-in returned successfully to the new switchboard |
+| Personal Gitea OAuth | Operator completed consent; `get_me` verified the actual upstream account; `list_my_repos` succeeded through app-enrolled access |
+| No personal credential | Gitea call failed without a credential; adapter has no shared-account fallback |
+| Home Assistant | Fixed GET `/api/` returned `API running.` through scoped access; app exposes no device-control tool |
+| Ownership | All five evaluated resources assigned to operator and explicit team with private visibility; persisted across broker restart |
+| Strict app arguments | Unexpected arguments and ungranted service tools rejected before forwarding |
+| Independent agent grants | Two HTTP probe enrollments worked; revoking one returned 401 for its subsequent calls while the other remained usable |
+| Official protocol client | Python MCP SDK 2.2.0 initialized with 2025-11-25, listed granted tools, and called Home Assistant |
+| Live restart | Recreated app preserved revoked and active enrollments; SDK call still succeeded; all temporary test agents subsequently revoked and test request resolved |
+| Application tests | 13 tests passed, including ownership, CSRF, origin/host restrictions, secret redaction, argument bounds, reconnect isolation, and revocation across reconstructed app state |
+| Browser | Pocket ID return and authenticated switchboard verified; desktop and 390px mobile layouts reviewed; guided setup dialog opened |
+| Actual distinct agent products | Not tested; SDK and HTTP probes are not proof of two commercial runtimes |
+| Two real upstream users | Not tested; mocked ownership tests do not prove broker multi-user identity isolation |
+| Forced provider refresh/expiry | Not tested; delegated to broker |
 
-## Findings that affect the design
+## Findings and containment
 
-ContextForge's startup assignment logic sets visibility to public for resources without teams. The pinned [bootstrap implementation](https://github.com/IBM/mcp-context-forge/blob/v1.0.7-20260921/mcpgateway/bootstrap_db.py) contains that assignment. The evaluation repaired its three resources with explicit team ownership and private visibility and verified those values after restart. A future setup wizard must require team ownership and verify persisted access; this is not evidence that all multi-user behavior is safe.
+**Broker startup visibility:** resources without a team were made public by the pinned broker's startup assignment logic. All reviewed resources now have explicit owner/team assignments and private visibility, verified after restart. The initial bootstrap-owned resources also had to be reassigned to the intended operator before their personal connection could execute. This is an installation requirement, not proof of general multi-user safety.
 
-The REST schema rejection gate remains open. The probe supplies a harmless extra argument; it does not demonstrate arbitrary URL access or a write. Nevertheless, schema declaration and read-only annotations cannot substitute for execution enforcement. The availability probe's URL and HTTP method are fixed and direct passthrough is disabled. Keep this trial limited until input handling is understood and tested.
+**Broker argument validation:** the original REST tool accepted undeclared arguments even with `additionalProperties=false` and experimental validation enabled. The application now uses a fixed tool allowlist and validates arguments before forwarding. The gateway is internal-only behind the app. The old `evaluation/probe.py` failure remains valid for direct access to the evaluated gateway; it is not silently reclassified as passed.
 
-The Home Assistant credential is a borrowed existing token, explicitly treated as a shared connection. Its upstream permissions were not narrowed by the gateway. A dedicated least-privilege credential is required before expansion. Gitea is configured for personal OAuth with no static fallback, but personal identity has not been verified until the user authorizes and `get_me` succeeds under that user's connection.
+**Broker profile shape:** `/auth/email/me` does not return the user's UUID. The application first requires that endpoint to validate the session, then uses that same verified JWT's `sub` and rejects API-token use at the browser control plane. This was discovered by live testing and reflected in the mock contract.
 
-No gateway foundation has been selected. No upstream issue or security report has been submitted by this evaluation. Next: finish user login and Gitea consent, resolve the schema gate, and run the two-user/two-runtime checks in the main evaluation plan.
+**Gitea repository schema:** the actual adapter uses `page` and `per_page`. The app further bounds these to integers and limits page size to 50. Unknown arguments are rejected rather than silently passed through.
+
+**Upstream image health check:** the pinned Gitea adapter's health check used `/bin/sh`, absent in its image. An exec-form `/app/gitea-mcp -healthcheck` succeeds; Compose overrides and the minimal derived Dockerfile correct that packaging issue.
+
+**Identity and scopes:** the broker still maps SSO accounts by verified email. The app's UUID allowlist does not solve upstream issuer/subject binding. Gitea requested `read:user read:repository`, but its stored token scopes were empty; successful read calls do not prove the full effective permission set. Home Assistant uses a borrowed shared token whose underlying permissions may exceed the one exposed tool. Keep the preview restricted to its operator.
+
+The implemented UI, runtime endpoint, installation contract, operational limits, and remaining release gates are described in [the preview guide](../docs/PREVIEW.md). No upstream issue or security report has been submitted as part of this work.

@@ -6,9 +6,11 @@ An open-source, self-hosted connection manager for AI agents.
 
 ## Project status
 
-Planning and evaluation. There is no installable application or production release yet. Features described below are planned, not implemented. We are evaluating existing MCP gateways before choosing the implementation foundation.
+**Usable single-operator preview.** The repository now contains the Home Agent Tools web app: Pocket ID sign-in, a personal Gitea connection, an explicitly shared Home Assistant status check, guided connection review, scoped agent enrollment, revocation, a request inbox, and redacted activity.
 
-A [connection evaluation](evaluation/README.md) now provides pinned ContextForge and Gitea MCP containers, Pocket ID configuration, a Home Assistant availability probe, and verification steps. This trial is separate from the planned application UI.
+The app uses ContextForge as an internal credential broker. This is not yet a general-purpose or multi-tenant release. A pre-provisioned broker workspace is required; UniFi, arbitrary service setup, role management, hosted OAuth-client compatibility, and skill distribution remain future work.
+
+See [installation, runtime connection, and limitations](docs/PREVIEW.md), [live verification results](evaluation/RESULTS.md), and the [connection evaluation](evaluation/README.md). Runtime dependencies and container images are pinned. No service credentials belong in this repository.
 
 ## Vision
 

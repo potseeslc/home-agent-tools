@@ -26,6 +26,9 @@ services:
   gitea:
     # Official Gitea MCP v1.7.0; no stored token or fallback account.
     image: docker.gitea.com/gitea-mcp-server@sha256:273827c5cf8fec3846c09bd35461b59bdd06941bdcfcfefd388cbc22f2343f6b
+    # The upstream image uses CMD-SHELL but contains no /bin/sh.
+    healthcheck:
+      test: ["CMD", "/app/gitea-mcp", "-healthcheck"]
     command: ["/app/gitea-mcp", "-t", "http", "-H", "${GITEA_URL:?Set your Gitea HTTPS URL}", "-r", "-O", "get_me,list_my_repos"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]

@@ -1,5 +1,7 @@
 # Selected UI direction
 
+> Implementation status: a single-operator application preview now exists. See [what is implemented and how to run it](PREVIEW.md). This document also describes future capabilities and is not a release claim.
+
 Accepted September 25, 2026. Design decision only; these screens are not implemented.
 
 The interface combines concepts 1 (Switchboard), 3 (Request Inbox), and 8 (Pocket Remote), with concept 7 (Guided Setup) for service administrators.

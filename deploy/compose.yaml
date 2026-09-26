@@ -1,0 +1,20 @@
+name: home-agent-tools
+services:
+  app:
+    build:
+      context: ..
+    env_file: ["${HAT_ENV_FILE:?Set a private app env file}"]
+    ports: ["127.0.0.1:4444:4450"]
+    volumes: ["app-data:/data"]
+    networks: [engine]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1
+    restart: unless-stopped
+networks:
+  engine:
+    external: true
+    name: ${HAT_ENGINE_NETWORK:-hat-eval}
+volumes:
+  app-data:

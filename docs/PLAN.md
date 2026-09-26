@@ -1,5 +1,7 @@
 # Product plan
 
+> Implementation status: a single-operator application preview now exists. See [what is implemented and how to run it](PREVIEW.md). This document also describes future capabilities and is not a release claim.
+
 Draft, September 25, 2026. This is a public design proposal, not deployed functionality.
 
 ## User experience

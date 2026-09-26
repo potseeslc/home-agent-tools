@@ -2,7 +2,7 @@
 
 This is an isolated trial of existing software, not the Home Agent Tools application or a production deployment. It does not yet establish two-user identity isolation, runtime portability, refresh/revocation reliability, or skill distribution.
 
-**Current outcome:** [live evaluation results](RESULTS.md). The availability call works; the schema-rejection gate fails. Do not expand this configuration to other users yet.
+**Current outcome:** [live evaluation results](RESULTS.md). Personal Gitea and shared Home Assistant calls work. Direct gateway schema validation still fails; the new [application preview](../docs/PREVIEW.md) adds enforcement and keeps the gateway internal-only. Do not expand to untrusted users yet.
 
 ## Components
 
