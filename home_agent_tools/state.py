@@ -1,4 +1,5 @@
 """Small local control store. Never stores upstream or agent bearer credentials."""
+
 import json
 import sqlite3
 import time
@@ -12,7 +13,8 @@ class State:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         with self.db() as db:
-            db.executescript("""
+            db.executescript(
+                """
             PRAGMA journal_mode=WAL;
             CREATE TABLE IF NOT EXISTS agents (
               id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL,
@@ -28,7 +30,8 @@ class State:
             CREATE TABLE IF NOT EXISTS requests (
               id TEXT PRIMARY KEY, owner TEXT NOT NULL, agent TEXT NOT NULL,
               service TEXT NOT NULL, status TEXT NOT NULL, created REAL NOT NULL, expires REAL NOT NULL);
-            """)
+            """
+            )
 
     @contextmanager
     def db(self):
@@ -45,30 +48,52 @@ class State:
 
     def event(self, owner, actor, action, service=None, outcome="success"):
         with self.db() as db:
-            db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?)", (uuid.uuid4().hex, owner, actor, action, service, outcome, time.time()))
+            db.execute(
+                "INSERT INTO events VALUES (?,?,?,?,?,?,?)",
+                (uuid.uuid4().hex, owner, actor, action, service, outcome, time.time()),
+            )
             # Bounded retention; never retain tool arguments/results or tokens.
             db.execute("DELETE FROM events WHERE at < ?", (time.time() - 30 * 86400,))
 
     def observation(self, owner, service, status, identity=None):
         with self.db() as db:
-            old = db.execute("SELECT identity FROM observations WHERE owner=? AND service=?", (owner, service)).fetchone()
-            changed = bool(old and old['identity'] and identity and old['identity'] != identity)
+            old = db.execute(
+                "SELECT identity FROM observations WHERE owner=? AND service=?",
+                (owner, service),
+            ).fetchone()
+            changed = bool(
+                old and old["identity"] and identity and old["identity"] != identity
+            )
             if changed:
                 # A different upstream account must not inherit agent grants.
-                for row in db.execute("SELECT id,services FROM agents WHERE owner=? AND active=1", (owner,)).fetchall():
-                    if service in json.loads(row['services']):
-                        db.execute("UPDATE agents SET active=0 WHERE id=?", (row['id'],))
+                for row in db.execute(
+                    "SELECT id,services FROM agents WHERE owner=? AND active=1",
+                    (owner,),
+                ).fetchall():
+                    if service in json.loads(row["services"]):
+                        db.execute(
+                            "UPDATE agents SET active=0 WHERE id=?", (row["id"],)
+                        )
             # A transient failure must not erase the last verified identity.
-            retained_identity = identity or (old['identity'] if old else None)
-            db.execute("INSERT OR REPLACE INTO observations VALUES (?,?,?,?,?)", (owner, service, status, retained_identity, time.time()))
+            retained_identity = identity or (old["identity"] if old else None)
+            db.execute(
+                "INSERT OR REPLACE INTO observations VALUES (?,?,?,?,?)",
+                (owner, service, status, retained_identity, time.time()),
+            )
         return changed
 
     def request(self, owner, agent, service):
         now = time.time()
         with self.db() as db:
-            existing = db.execute("SELECT id FROM requests WHERE owner=? AND agent=? AND service=? AND status='pending' AND expires>?", (owner, agent, service, now)).fetchone()
+            existing = db.execute(
+                "SELECT id FROM requests WHERE owner=? AND agent=? AND service=? AND status='pending' AND expires>?",
+                (owner, agent, service, now),
+            ).fetchone()
             if existing:
-                return existing['id']
+                return existing["id"]
             request_id = uuid.uuid4().hex
-            db.execute("INSERT INTO requests VALUES (?,?,?,?,?,?,?)", (request_id, owner, agent, service, 'pending', now, now + 86400))
+            db.execute(
+                "INSERT INTO requests VALUES (?,?,?,?,?,?,?)",
+                (request_id, owner, agent, service, "pending", now, now + 86400),
+            )
             return request_id
