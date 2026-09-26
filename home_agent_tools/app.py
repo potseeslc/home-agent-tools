@@ -1,7 +1,7 @@
 """User-facing control plane and strictly bounded MCP entry point.
 
-ContextForge remains the private authentication/credential broker. This app
-never returns its tool/gateway credential objects to the browser.
+ContextForge brokers authentication and Gitea credentials. Personal Home Assistant
+credentials live in the app vault. Neither is returned to the browser.
 """
 
 import hashlib
@@ -9,6 +9,7 @@ import base64
 import hmac
 import json
 import os
+import secrets
 import time
 import uuid
 from dataclasses import dataclass
@@ -23,6 +24,9 @@ from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ConfigDict, Field
 
 from .state import State
+from .vault import Vault
+from .authorization import Authorization
+from .home_assistant import HomeAssistant
 
 TOOLS = {
     "homeassistant": {
@@ -62,6 +66,8 @@ class Settings:
     state_path: str
     provider: str = "pocketid"
     oidc_origin: str = ""
+    ha_url: str = ""
+    ha_shared_preview: bool = False
 
     @classmethod
     def env(cls):
@@ -81,6 +87,27 @@ class Settings:
             raise RuntimeError(
                 "Public URL requires HTTPS except for a localhost tunnel."
             )
+        ha_url = os.environ.get("HAT_HOME_ASSISTANT_URL", "").rstrip("/")
+        if ha_url:
+            ha = urlsplit(ha_url)
+            if (
+                ha.username
+                or ha.password
+                or ha.query
+                or ha.fragment
+                or ha.path
+                or not ha.hostname
+                or (
+                    ha.scheme != "https"
+                    and not (
+                        ha.scheme == "http"
+                        and os.environ.get("HAT_ALLOW_HTTP_HOME_ASSISTANT") == "true"
+                    )
+                )
+            ):
+                raise RuntimeError(
+                    "Home Assistant requires a fixed HTTPS origin, or explicitly permitted private HTTP origin."
+                )
         return cls(
             os.environ.get("HAT_GATEWAY_URL", "http://gateway:4444").rstrip("/"),
             public,
@@ -88,6 +115,7 @@ class Settings:
             users,
             os.environ.get("HAT_STATE_PATH", "/data/hat.sqlite"),
             oidc_origin=os.environ.get("HAT_OIDC_ORIGIN", ""),
+            ha_url=ha_url,
         )
 
 
@@ -98,14 +126,14 @@ class StrictModel(BaseModel):
 class Enrollment(StrictModel):
     name: str = Field(min_length=1, max_length=60, pattern=r"^[\w .()\-]+$")
     services: list[str] = Field(min_length=1, max_length=2)
-    days: int = Field(default=7, ge=1, le=30)
+    days: int = Field(default=90, ge=1, le=90)
 
 
 def fingerprint(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_app(settings=None, transport=None):
+def create_app(settings=None, transport=None, ha_transport=None):
     cfg = settings or Settings.env()
     app = FastAPI(
         title="Home Agent Tools", docs_url=None, redoc_url=None, openapi_url=None
@@ -113,6 +141,10 @@ def create_app(settings=None, transport=None):
     state = State(cfg.state_path)
     app.state.store = state
     app.state.config = cfg
+    vault = Vault(state, cfg.secret)
+    ha = HomeAssistant(cfg, state, vault, ha_transport)
+    app.state.vault = vault
+    app.state.home_assistant = ha
     static = Path(__file__).parent / "static"
 
     async def broker(method, path, *, token=None, body=None, cookies=None):
@@ -221,6 +253,10 @@ def create_app(settings=None, transport=None):
             raise HTTPException(
                 409, "An administrator must provision your private workspace first."
             )
+        if cfg.ha_url:
+            tool_names.add(TOOLS["homeassistant"]["name"])
+        elif not cfg.ha_shared_preview:
+            tool_names.discard(TOOLS["homeassistant"]["name"])
         return data, servers[0], tool_names
 
     async def issue(u, token, name, days):
@@ -309,6 +345,10 @@ def create_app(settings=None, transport=None):
                     )
             request._body = bytes(body)
         response = await call_next(request)
+        if request.url.path == "/mcp" and response.status_code == 401:
+            response.headers["WWW-Authenticate"] = (
+                f'Bearer resource_metadata="{cfg.public_url}/.well-known/oauth-protected-resource/mcp"'
+            )
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -319,7 +359,7 @@ def create_app(settings=None, transport=None):
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "application": "Home Agent Tools", "version": "0.1.0"}
+        return {"status": "ok", "application": "Home Agent Tools", "version": "0.2.0"}
 
     @app.get("/login")
     async def login():
@@ -353,12 +393,13 @@ def create_app(settings=None, transport=None):
             cookies=request.headers.get("cookie", ""),
         )
         location = response.headers.get("location", "")
+        pending = authorization.pending(request)
         return auth_response(
             response,
             (
                 "/?login=failed"
                 if "error=" in location or response.status_code >= 400
-                else "/"
+                else ("/?authorize=" + pending if pending else "/")
             ),
         )
 
@@ -418,13 +459,25 @@ def create_app(settings=None, transport=None):
         connections = []
         for key, definition in TOOLS.items():
             observation = observations.get(key, {})
+            personal_ha = key == "homeassistant" and not cfg.ha_shared_preview
+            if personal_ha and not vault.get("ha", u["id"]):
+                observation = {
+                    "status": (
+                        "needs_attention"
+                        if observation.get("status") == "needs_attention"
+                        else "sign_in_required"
+                    )
+                }
+            configured = (
+                bool(cfg.ha_url) if personal_ha else definition["name"] in names
+            )
             connections.append(
                 {
                     "id": key,
                     "name": definition["title"],
-                    "mode": definition["mode"],
+                    "mode": "personal" if personal_ha else definition["mode"],
                     "description": definition["description"],
-                    "configured": definition["name"] in names,
+                    "configured": configured,
                     "status": observation.get("status", "not_checked"),
                     "identity": observation.get("identity"),
                     "checked": observation.get("checked"),
@@ -451,7 +504,7 @@ def create_app(settings=None, transport=None):
             "mcp_url": cfg.public_url + "/mcp",
             "limitations": [
                 "Single-operator preview: additional users require explicit provisioning.",
-                "Agent authentication uses individually revocable gateway tokens.",
+                "Agent approval lasts up to 90 days; browser-authorized access tokens renew within that fixed period.",
                 "Only the listed read tools are available.",
             ],
         }
@@ -461,6 +514,8 @@ def create_app(settings=None, transport=None):
         u, token = await user(request, True)
         if service not in TOOLS:
             raise HTTPException(404)
+        if service == "homeassistant" and not cfg.ha_shared_preview:
+            return await ha.verify(u["id"])
         data, _, names = await context(u, token)
         if service == "gitea" and TOOLS[service]["name"] not in names:
             gateways = [
@@ -564,14 +619,25 @@ def create_app(settings=None, transport=None):
             response.status_code == 200
             and "OAuth Authorization Successful" in response.text
         )
+        rid = authorization.pending(request)
         return RedirectResponse(
-            "/?connection=" + ("verify" if successful else "failed")
+            "/?connection="
+            + ("verify" if successful else "failed")
+            + ("&authorize=" + rid if rid else "")
         )
 
-    @app.post("/api/agents")
-    async def enroll(body: Enrollment, request: Request):
-        u, token = await user(request, True)
+    async def enroll_agent(u, token, name, requested_services, days):
+        body = Enrollment(name=name, services=requested_services, days=days)
         services = sorted(set(body.services))
+        if (
+            "homeassistant" in services
+            and not cfg.ha_shared_preview
+            and not vault.get("ha", u["id"])
+        ):
+            raise HTTPException(
+                409,
+                "Connect your personal Home Assistant account before granting access.",
+            )
         if any(s not in TOOLS for s in services):
             raise HTTPException(422, "Choose supported services.")
         _, _, names = await context(u, token)
@@ -595,6 +661,7 @@ def create_app(settings=None, transport=None):
             u, token, "hat-" + body.name + "-" + uuid.uuid4().hex[:6], body.days
         )
         agent_id = uuid.uuid4().hex
+        access_token = secrets.token_urlsafe(40)
         try:
             with state.db() as db:
                 db.execute(
@@ -603,7 +670,7 @@ def create_app(settings=None, transport=None):
                         agent_id,
                         u["id"],
                         body.name,
-                        fingerprint(issued["access_token"]),
+                        fingerprint(access_token),
                         issued["token"]["id"],
                         json.dumps(services),
                         time.time() + body.days * 86400,
@@ -612,16 +679,26 @@ def create_app(settings=None, transport=None):
                         None,
                     ),
                 )
+                vault.put("agent", agent_id, {"token": issued["access_token"]}, db)
         except Exception:
             await broker("DELETE", "/tokens/" + issued["token"]["id"], token=token)
             raise
         state.event(u["id"], body.name, "agent.enrolled")
         return {
             "id": agent_id,
-            "token": issued["access_token"],
+            "token": access_token,
             "url": cfg.public_url + "/mcp",
             "message": "Copy this token now. It will not be shown again.",
         }
+
+    @app.post("/api/agents")
+    async def enroll(body: Enrollment, request: Request):
+        u, token = await user(request, True)
+        return await enroll_agent(u, token, body.name, body.services, body.days)
+
+    authorization = Authorization(app, cfg, state, vault, user, enroll_agent)
+    app.state.authorization = authorization
+    ha.mount(app, user, authorization.pending)
 
     @app.delete("/api/agents/{agent_id}")
     async def revoke(agent_id: str, request: Request):
@@ -690,6 +767,11 @@ def create_app(settings=None, transport=None):
             row = db.execute(
                 "SELECT * FROM agents WHERE fingerprint=?", (fingerprint(token),)
             ).fetchone()
+            if not row:
+                row = db.execute(
+                    "SELECT a.* FROM agents a JOIN access_tokens t ON t.agent=a.id WHERE t.hash=? AND t.expires>?",
+                    (fingerprint(token), time.time()),
+                ).fetchone()
         if (
             not row
             or not row["active"]
@@ -697,11 +779,26 @@ def create_app(settings=None, transport=None):
             or row["owner"] not in cfg.allowed_users
         ):
             raise HTTPException(401, "Agent access expired or was revoked.")
+        saved = vault.get("agent", row["id"])
+        if saved:
+            token = saved["token"]
         # Check broker revocation/account status on every request, including discovery.
         valid = await rpc(token, "tools/list", {})
         if "error" in valid:
             raise HTTPException(403, "Gateway access denied.")
-        return dict(row), token, valid.get("result", {}).get("tools", [])
+        available = valid.get("result", {}).get("tools", [])
+        if not cfg.ha_shared_preview:
+            available = [
+                t for t in available if t["name"] != TOOLS["homeassistant"]["name"]
+            ]
+            if cfg.ha_url:
+                available.append(
+                    {
+                        "name": TOOLS["homeassistant"]["name"],
+                        "description": "Check Home Assistant availability using your personal account.",
+                    }
+                )
+        return dict(row), token, available
 
     @app.api_route("/mcp", methods=["GET", "DELETE"])
     async def mcp_no_stream(request: Request):
@@ -753,7 +850,7 @@ def create_app(settings=None, transport=None):
                     else "2025-06-18"
                 ),
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "Home Agent Tools", "version": "0.1.0"},
+                "serverInfo": {"name": "Home Agent Tools", "version": "0.2.0"},
                 "instructions": "Use the granted read tools. If a connection needs attention, call home_agent_request_connection and give the signed-in owner its link. Never ask for upstream credentials in chat.",
             }
         elif method == "ping":
@@ -886,9 +983,15 @@ def create_app(settings=None, transport=None):
                     ).fetchone()["active"]
                 if not active:
                     raise HTTPException(401, "Agent access was revoked.")
-                upstream = await rpc(
-                    token, "tools/call", {"name": name, "arguments": arguments}
-                )
+                if service == "homeassistant" and not cfg.ha_shared_preview:
+                    try:
+                        upstream = {"result": await ha.status(enrollment["owner"])}
+                    except HTTPException:
+                        upstream = {"error": True}
+                else:
+                    upstream = await rpc(
+                        token, "tools/call", {"name": name, "arguments": arguments}
+                    )
                 if "error" in upstream:
                     state.event(
                         enrollment["owner"],

@@ -34,7 +34,9 @@ const status = (c) =>
       ? "Connected"
       : c.status === "needs_attention"
         ? "Needs attention"
-        : "Ready to verify";
+        : c.status === "sign_in_required"
+          ? "Sign-in required"
+          : "Ready to verify";
 const identity = (c) => {
   try {
     return JSON.parse(c.identity)?.login || "Not verified";
@@ -82,11 +84,13 @@ async function api(path, options = {}) {
 }
 async function refresh() {
   data = await api("/api/bootstrap");
+  const rid = new URLSearchParams(location.search).get("authorize");
   render();
+  if (rid) await reviewAuthorization(rid);
 }
 function renderLogin() {
   $("#app").innerHTML =
-    `<main class="login"><div class="login-brand"><img src="/static/mark.svg" alt="" width="46"><span>home agent tools</span><span class="tag">EARLY ACCESS</span></div><div class="login-layout"><section><p class="eyebrow">YOUR HOME. YOUR ACCOUNTS. YOUR AGENTS.</p><h1>A place for<br>everything<br>to connect.</h1><p class="intro">Bring your tools together. Know who’s connected.<br>Stay in control of what every agent can do.</p><a class="button primary login-button" href="/login">Sign in with Pocket ID <span>↗</span></a><p class="fine">Passkey sign-in · Self-hosted · Private by default</p>${new URLSearchParams(location.search).get("login") === "failed" ? '<p class="notice error">Sign-in did not complete. Please try again.</p>' : ""}</section><section class="login-board" aria-label="Your connection switchboard"><div class="wire wire-a"></div><div class="wire wire-b"></div><div class="floating-node n1"><span class="service-icon">⌂</span> Your home</div><div class="floating-node n2"><span class="service-icon">⌥</span> Your accounts</div><div class="center-node"><img src="/static/mark.svg" width="52" alt=""><strong>One connection.<br>Your rules.</strong><span>HOME AGENT TOOLS</span></div><div class="floating-node n3"><span class="dot"></span> Your AI agents</div><p class="board-note">A little less setup.<br>A lot more clarity.</p></section></div><footer>Built for a home that runs on your terms.<span>Self-hosted preview · v0.1</span></footer></main>`;
+    `<main class="login"><div class="login-brand"><img src="/static/mark.svg" alt="" width="46"><span>home agent tools</span><span class="tag">EARLY ACCESS</span></div><div class="login-layout"><section><p class="eyebrow">YOUR HOME. YOUR ACCOUNTS. YOUR AGENTS.</p><h1>A place for<br>everything<br>to connect.</h1><p class="intro">Bring your tools together. Know who’s connected.<br>Stay in control of what every agent can do.</p><a class="button primary login-button" href="/login">Sign in with Pocket ID <span>↗</span></a><p class="fine">Passkey sign-in · Self-hosted · Private by default</p>${new URLSearchParams(location.search).get("login") === "failed" ? '<p class="notice error">Sign-in did not complete. Please try again.</p>' : ""}</section><section class="login-board" aria-label="Your connection switchboard"><div class="wire wire-a"></div><div class="wire wire-b"></div><div class="floating-node n1"><span class="service-icon">⌂</span> Your home</div><div class="floating-node n2"><span class="service-icon">⌥</span> Your accounts</div><div class="center-node"><img src="/static/mark.svg" width="52" alt=""><strong>One connection.<br>Your rules.</strong><span>HOME AGENT TOOLS</span></div><div class="floating-node n3"><span class="dot"></span> Your AI agents</div><p class="board-note">A little less setup.<br>A lot more clarity.</p></section></div><footer>Built for a home that runs on your terms.<span>Self-hosted preview · v0.2</span></footer></main>`;
 }
 function navItem(id, label) {
   return `<button class="nav-item ${view === id ? "active" : ""}" data-view="${id}" ${view === id ? 'aria-current="page"' : ""}><span class="nav-icon">${icons[id]}</span>${label}${id === "requests" && pending().length ? `<b class="count">${pending().length}</b>` : ""}</button>`;
@@ -97,7 +101,7 @@ function render() {
     (c) => c.status === "connected",
   ).length;
   $("#app").innerHTML =
-    `<div class="shell"><aside class="sidebar"><a class="brand" href="/"><img src="/static/mark.svg" width="36" alt=""><span>home agent<br><b>tools</b></span></a><div class="workspace"><span class="workspace-icon">⌂</span><div><strong>My home</strong><small>Private workspace</small></div><span class="tiny-dot"></span></div><nav aria-label="Main navigation">${navItem("switchboard", "Switchboard")}${navItem("agents", "Agents")}${navItem("requests", "Requests")}${navItem("activity", "Activity")}</nav><div class="sidebar-bottom"><div class="preview-label"><span class="dot"></span> LOCAL PREVIEW</div><p>Your connections stay<br>on your infrastructure.</p><a href="https://github.com/potseeslc/home-agent-tools" target="_blank" rel="noopener noreferrer">Project & documentation ↗</a></div><button class="profile" data-action="account"><span class="avatar">${esc(data.user.name.slice(0, 1))}</span><span><strong>${esc(data.user.name)}</strong><small>${data.user.admin ? "Owner" : "Member"} · Pocket ID</small></span><span>···</span></button></aside><main class="main"><header class="topbar"><span>HOME / <b>${esc(view.toUpperCase())}</b></span><div><span class="live-dot"></span> Your private workspace <span class="version">v0.1</span><button class="mobile-account" data-action="account" aria-label="Your account">···</button></div></header>${view === "switchboard" ? switchboard(connected) : view === "agents" ? agents() : view === "requests" ? requests() : activity()}<footer class="main-footer"><span><span class="tiny-dot"></span> Credentials stay in the connection engine</span><span>Made for your home, on your terms.</span></footer></main></div>`;
+    `<div class="shell"><aside class="sidebar"><a class="brand" href="/"><img src="/static/mark.svg" width="36" alt=""><span>home agent<br><b>tools</b></span></a><div class="workspace"><span class="workspace-icon">⌂</span><div><strong>My home</strong><small>Private workspace</small></div><span class="tiny-dot"></span></div><nav aria-label="Main navigation">${navItem("switchboard", "Switchboard")}${navItem("agents", "Agents")}${navItem("requests", "Requests")}${navItem("activity", "Activity")}</nav><div class="sidebar-bottom"><div class="preview-label"><span class="dot"></span> LOCAL PREVIEW</div><p>Your connections stay<br>on your infrastructure.</p><a href="https://github.com/potseeslc/home-agent-tools" target="_blank" rel="noopener noreferrer">Project & documentation ↗</a></div><button class="profile" data-action="account"><span class="avatar">${esc(data.user.name.slice(0, 1))}</span><span><strong>${esc(data.user.name)}</strong><small>${data.user.admin ? "Owner" : "Member"} · Pocket ID</small></span><span>···</span></button></aside><main class="main"><header class="topbar"><span>HOME / <b>${esc(view.toUpperCase())}</b></span><div><span class="live-dot"></span> Your private workspace <span class="version">v0.2</span><button class="mobile-account" data-action="account" aria-label="Your account">···</button></div></header>${view === "switchboard" ? switchboard(connected) : view === "agents" ? agents() : view === "requests" ? requests() : activity()}<footer class="main-footer"><span><span class="tiny-dot"></span> Credentials stay in the connection engine</span><span>Made for your home, on your terms.</span></footer></main></div>`;
   bind();
   const params = new URLSearchParams(location.search);
   if (params.has("connection")) {
@@ -107,20 +111,25 @@ function render() {
         : "Connection did not complete. Try reconnecting.",
       params.get("connection") !== "verify",
     );
-    history.replaceState({}, "", location.pathname);
+    params.delete("connection");
+    history.replaceState(
+      {},
+      "",
+      location.pathname + (params.toString() ? "?" + params.toString() : ""),
+    );
   }
 }
 function heading(kicker, title, description, button = "") {
   return `<section class="page-heading"><div><p class="eyebrow">${kicker}</p><h1>${title}</h1><p class="subheading">${description}</p></div>${button}</section>`;
 }
 function switchboard(connected) {
-  return `${heading("EVERYTHING, IN ITS PLACE.", "Your switchboard.", "A clear view of the services your agents can use.", data.user.admin ? '<button class="button primary" data-action="setup">＋ Set up a connection</button>' : "")}<section class="summary-band"><div><span class="summary-number">${String(connected).padStart(2, "0")}</span><div><strong>verified connections</strong><small>Checked against the actual service</small></div></div><div><span class="summary-number">${String(data.agents.filter((a) => a.active && a.expires > Date.now() / 1000).length).padStart(2, "0")}</span><div><strong>active agents</strong><small>Each with its own access</small></div></div><button data-view="requests" class="summary-link"><span class="summary-number">${String(pending().length).padStart(2, "0")}</span><div><strong>need your attention</strong><small>${pending().length ? "Connection requests to review" : "A quiet inbox. Just how it should be."}</small></div><span>↗</span></button></section><section><div class="section-title"><h2>My connections <span>${data.connections.length}</span></h2><span class="muted">Access is granted per agent</span></div><div class="connections">${data.connections.map(card).join("")}</div></section><section class="next-step"><div class="step-mark">↗</div><div><p class="eyebrow">THE NEXT SMALL STEP</p><h2>${data.agents.length ? "A connection is only half the story." : "Give your first agent a place to plug in."}</h2><p>Choose its services, set an expiry, and copy one connection token.<br>You can revoke its access whenever you need to.</p></div><button class="button" data-action="enroll">Connect an agent <span>→</span></button></section><div class="footnote"><span>ⓘ</span><p><strong>Honest about access.</strong> Gitea uses your personal account. Home Assistant uses an explicitly shared credential. Successful login does not imply full service permissions.</p></div>`;
+  return `${heading("EVERYTHING, IN ITS PLACE.", "Your switchboard.", "A clear view of the services your agents can use.", data.user.admin ? '<button class="button primary" data-action="setup">＋ Set up a connection</button>' : "")}<section class="summary-band"><div><span class="summary-number">${String(connected).padStart(2, "0")}</span><div><strong>verified connections</strong><small>Checked against the actual service</small></div></div><div><span class="summary-number">${String(data.agents.filter((a) => a.active && a.expires > Date.now() / 1000).length).padStart(2, "0")}</span><div><strong>active agents</strong><small>Each with its own access</small></div></div><button data-view="requests" class="summary-link"><span class="summary-number">${String(pending().length).padStart(2, "0")}</span><div><strong>need your attention</strong><small>${pending().length ? "Connection requests to review" : "A quiet inbox. Just how it should be."}</small></div><span>↗</span></button></section><section><div class="section-title"><h2>My connections <span>${data.connections.length}</span></h2><span class="muted">Access is granted per agent</span></div><div class="connections">${data.connections.map(card).join("")}</div></section><section class="next-step"><div class="step-mark">↗</div><div><p class="eyebrow">THE NEXT SMALL STEP</p><h2>${data.agents.length ? "A connection is only half the story." : "Give your first agent a place to plug in."}</h2><p>Install the connector, sign in with Pocket ID, and approve its tools.<br>You can revoke its access whenever you need to.</p></div><button class="button" data-action="enroll">Connect an agent <span>→</span></button></section><div class="footnote"><span>ⓘ</span><p><strong>Honest about access.</strong> Each personal connection uses the account you authorize at that service. Successful login does not imply full service permissions.</p></div>`;
 }
 function card(c) {
-  return `<article class="connection-card"><div class="card-head"><span class="service-icon ${c.id}">${icons[c.id]}</span><span class="status ${c.status === "connected" ? "good" : c.status === "needs_attention" ? "warn" : ""}"><i></i>${status(c)}</span></div><h2>${esc(c.name)}</h2><p class="card-description">${esc(c.description)}</p><div class="account-line"><span>${c.mode === "personal" ? "PERSONAL ACCOUNT" : "SHARED CONNECTION"}</span><strong>${c.mode === "personal" ? esc(identity(c)) : "Home Assistant token owner"}</strong></div><dl class="card-details"><div><dt>Connection access</dt><dd>${c.mode === "personal" ? "Read user & repositories" : "Availability check only"}</dd></div><div><dt>Agent access</dt><dd>Only when explicitly granted</dd></div></dl><div class="card-bottom"><span>${c.checked ? "Checked " + when(c.checked) : "Account verification pending"}</span><button class="text-button" data-detail="${c.id}">Manage ↗</button></div></article>`;
+  return `<article class="connection-card"><div class="card-head"><span class="service-icon ${c.id}">${icons[c.id]}</span><span class="status ${c.status === "connected" ? "good" : c.status === "needs_attention" ? "warn" : ""}"><i></i>${status(c)}</span></div><h2>${esc(c.name)}</h2><p class="card-description">${esc(c.description)}</p><div class="account-line"><span>${c.mode === "personal" ? "PERSONAL ACCOUNT" : "SHARED CONNECTION"}</span><strong>${c.mode === "personal" ? esc(identity(c)) : "Home Assistant token owner"}</strong></div><dl class="card-details"><div><dt>Connection access</dt><dd>${c.id === "gitea" ? "Read user & repositories" : "Availability check only"}</dd></div><div><dt>Agent access</dt><dd>Only when explicitly granted</dd></div></dl><div class="card-bottom"><span>${c.checked ? "Checked " + when(c.checked) : "Account verification pending"}</span><button class="text-button" data-detail="${c.id}">Manage ↗</button></div></article>`;
 }
 function agents() {
-  return `${heading("A SEPARATE KEY FOR EVERY AGENT.", "Your agents.", "Give each runtime just the tools it needs. Take access back in one click.", '<button class="button primary" data-action="enroll">＋ Connect an agent</button>')}<div class="notice">Use one enrollment per runtime. Tokens work only at this app’s MCP endpoint; upstream credentials never leave the server.</div>${data.agents.length ? `<div class="list-panel">${data.agents.map((a) => `<article class="agent-row"><span class="agent-icon">⌘</span><div class="agent-info"><h3>${esc(a.name)}</h3><p>${a.services.map((s) => esc(data.connections.find((c) => c.id === s)?.name || s)).join(" · ")} <span class="tag">READ ONLY</span></p></div><div class="agent-date"><strong>${a.active && a.expires > Date.now() / 1000 ? "Expires " + when(a.expires) : "Access disabled"}</strong><small>${a.last_used ? "Last used " + when(a.last_used) : "Not used yet"}</small></div>${a.active && a.expires > Date.now() / 1000 ? `<button class="button small danger" data-revoke="${a.id}">Revoke access</button>` : '<span class="status">Inactive</span>'}</article>`).join("")}</div>` : empty("⌘", "No agents connected yet.", "Start with one runtime. Choose its services and give it a separate token.", '<button class="button" data-action="enroll">Connect your first agent →</button>')}<section class="help-panel"><h2>Works with clients that accept a remote MCP URL and bearer token.</h2><p>Copy the endpoint and token into your runtime’s MCP settings. OAuth-only hosted clients need a separate compatibility step; we won’t mark them supported until they’ve been tested.</p><code>${esc(data.mcp_url)}</code></section>`;
+  return `${heading("A SEPARATE KEY FOR EVERY AGENT.", "Your agents.", "Give each runtime just the tools it needs. Take access back in one click.", '<button class="button primary" data-action="enroll">＋ Connect an agent</button>')}<div class="notice">Use one enrollment per runtime. Tokens work only at this app’s MCP endpoint; upstream credentials never leave the server.</div>${data.agents.length ? `<div class="list-panel">${data.agents.map((a) => `<article class="agent-row"><span class="agent-icon">⌘</span><div class="agent-info"><h3>${esc(a.name)}</h3><p>${a.services.map((s) => esc(data.connections.find((c) => c.id === s)?.name || s)).join(" · ")} <span class="tag">READ ONLY</span></p></div><div class="agent-date"><strong>${a.active && a.expires > Date.now() / 1000 ? "Expires " + when(a.expires) : "Access disabled"}</strong><small>${a.last_used ? "Last used " + when(a.last_used) : "Not used yet"}</small></div>${a.active && a.expires > Date.now() / 1000 ? `<button class="button small danger" data-revoke="${a.id}">Revoke access</button>` : '<span class="status">Inactive</span>'}</article>`).join("")}</div>` : empty("⌘", "No agents connected yet.", "Start with one runtime. Choose its services and give it a separate token.", '<button class="button" data-action="enroll">Connect your first agent →</button>')}<section class="help-panel"><h2>Connect through browser sign-in or the local connector.</h2><p>Native OAuth clients can discover the sign-in flow at this endpoint. The local connector supports clients using stdio. Hosted clients with non-local callbacks are not enabled in this release.</p><code>${esc(data.mcp_url)}</code></section>`;
 }
 function requests() {
   const items = data.requests;
@@ -198,9 +207,12 @@ function bindModal() {
     (el) =>
       (el.onclick = () =>
         run(async () => {
-          const result = await api("/api/connections/gitea/connect", {
-            method: "POST",
-          });
+          const result = await api(
+            `/api/connections/${el.dataset.reconnect || "gitea"}/connect`,
+            {
+              method: "POST",
+            },
+          );
           location.assign(result.url);
         })),
   );
@@ -238,13 +250,43 @@ function details(id) {
   const c = data.connections.find((c) => c.id === id);
   modal(
     `${esc(c.name)} connection`,
-    `<div class="detail-status"><span class="status ${c.status === "connected" ? "good" : ""}"><i></i>${status(c)}</span><span class="tag">${c.mode === "personal" ? "PERSONAL" : "SHARED"}</span></div><p class="modal-copy">${c.mode === "personal" ? "Calls use your own Gitea authorization. If it expires, reconnect your account here. There is no fallback account. Reconnecting pauses agents with Gitea access; verify the account and enroll them again." : "This connection uses a shared Home Assistant credential. The service sees its token owner; this app records the requesting agent."}</p><div class="permission-layers"><div><b>01</b><section><small>CONNECTED ACCOUNT</small><strong>${c.mode === "personal" ? esc(identity(c)) : "Shared token owner"}</strong><p>Upstream account permissions: not fully verified</p></section></div><div><b>02</b><section><small>CONNECTION ACCESS</small><strong>${c.mode === "personal" ? "Read user and repositories" : "Fixed availability endpoint"}</strong><p>${c.mode === "personal" ? "Requested scopes: read:user, read:repository" : "The underlying token may have broader access."}</p></section></div><div><b>03</b><section><small>THIS APP’S AGENT ACCESS</small><strong>Explicit grants · Read tools only</strong><p>Connecting a service does not grant every agent access.</p></section></div></div><p class="fine">${c.checked ? "Last verified " + when(c.checked) : "Run a check to verify this connection."}</p><div class="modal-actions"><button class="button primary" data-check="${id}">Verify connection ↗</button>${id === "gitea" ? '<button class="button" data-reconnect>Reconnect account</button>' : ""}</div>`,
+    `<div class="detail-status"><span class="status ${c.status === "connected" ? "good" : ""}">${status(c)}</span><span class="tag">${c.mode === "personal" ? "PERSONAL ACCOUNT" : "SHARED"}</span></div><p class="modal-copy">Sign in at ${esc(c.name)} to connect your own account. Credentials renew in the background when supported. Reconnecting pauses agents with access to this service; approve new connections after verifying the account.</p><div class="permission-layers"><div><b>01</b><section><small>CONNECTED ACCOUNT</small><strong>${esc(identity(c))}</strong><p>Pocket ID identifies you here. ${esc(c.name)} authorizes its own account.</p></section></div><div><b>02</b><section><small>SERVICE AUTHORIZATION</small><strong>${id === "gitea" ? "Requested: read user and repositories" : "Your Home Assistant user permissions"}</strong><p>${id === "gitea" ? "Requested scopes: read:user, read:repository. Full upstream permissions are not verified." : "Home Assistant tokens can permit more than the availability tool. The app exposes only the fixed read check."}</p></section></div><div><b>03</b><section><small>AGENT APPROVAL</small><strong>30 or 90 days · Explicit tool grants</strong><p>Signing out of the dashboard does not disconnect approved agents.</p></section></div></div><p class="fine">${c.checked ? "Last verified " + when(c.checked) : "Personal authorization is required."}</p><div class="modal-actions"><button class="button primary" data-reconnect="${id}" ${!c.configured ? "disabled" : ""}>Sign in with ${esc(c.name)} ↗</button><button class="button" data-check="${id}">Verify connection</button></div>${id === "homeassistant" && c.status === "connected" ? '<button class="text-button danger" id="disconnect-ha">Disconnect account</button>' : ""}`,
   );
+  if ($("#disconnect-ha"))
+    $("#disconnect-ha").onclick = () =>
+      run(async () => {
+        const r = await api("/api/connections/homeassistant", {
+          method: "DELETE",
+        });
+        closeModal();
+        await refresh();
+        toast(
+          r.upstream_revoked
+            ? "Home Assistant disconnected."
+            : "Disconnected here. Revoke the application token in Home Assistant as well.",
+        );
+      });
 }
 function enrollForm() {
+  const command = `home-agent-tools setup --server ${data.mcp_url.replace(/\/mcp$/, "")}`;
+  modal(
+    "One setup. Your agents connected.",
+    `<p class="modal-copy">Run the connector on your computer. It detects supported clients, opens Pocket ID sign-in, and asks you to approve each agent separately.</p><label>Setup command<input readonly id="setup-command" value="${esc(command)}"></label><div class="review-box"><h3>90 days, with you in control.</h3><p>Choose 30 or 90 days in the browser. Short-lived access tokens renew automatically within that fixed period. You can revoke the agent at any time.</p></div><p class="fine">First installation: follow the one-command installer in the project guide. Codex and Claude Desktop configuration adapters are included; clients may need a restart.</p><div class="modal-actions"><button class="button primary" id="copy-setup">Copy command</button><a class="button" href="https://github.com/potseeslc/home-agent-tools/blob/codex/browser-agent-setup/docs/CONNECTOR.md" target="_blank" rel="noopener">Installation guide ↗</a></div><button class="text-button" id="manual-enroll">Advanced: create a manual token</button>`,
+  );
+  $("#copy-setup").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      toast("Setup command copied.");
+    } catch {
+      $("#setup-command").select();
+    }
+  };
+  $("#manual-enroll").onclick = manualEnrollForm;
+}
+function manualEnrollForm() {
   modal(
     "Give an agent its own key.",
-    `<p class="modal-copy">Choose what this runtime may use. Start small; you can revoke this enrollment independently.</p><form id="enroll-form"><label>Agent name<input name="name" maxlength="60" placeholder="e.g. My desktop assistant" required autocomplete="off"></label><fieldset><legend>Allowed connections</legend>${data.connections.map((c) => `<label class="check-card"><input type="checkbox" name="services" value="${c.id}" ${c.status !== "connected" ? "disabled" : ""}><span><strong>${esc(c.name)}</strong><small>${c.status === "connected" ? c.description : "Verify this connection first"}</small></span><span class="tag">READ</span></label>`).join("")}</fieldset><label>Access expires<select name="days"><option value="1">In 24 hours</option><option value="7" selected>In 7 days</option><option value="30">In 30 days</option></select></label><div class="modal-actions"><button class="button primary" type="submit">Create agent connection →</button></div></form>`,
+    `<p class="modal-copy">Choose what this runtime may use. Start small; you can revoke this enrollment independently.</p><form id="enroll-form"><label>Agent name<input name="name" maxlength="60" placeholder="e.g. My desktop assistant" required autocomplete="off"></label><fieldset><legend>Allowed connections</legend>${data.connections.map((c) => `<label class="check-card"><input type="checkbox" name="services" value="${c.id}" ${c.status !== "connected" ? "disabled" : ""}><span><strong>${esc(c.name)}</strong><small>${c.status === "connected" ? c.description : "Verify this connection first"}</small></span><span class="tag">READ</span></label>`).join("")}</fieldset><label>Access expires<select name="days"><option value="1">In 24 hours</option><option value="30">In 30 days</option><option value="90" selected>In 90 days</option></select></label><div class="modal-actions"><button class="button primary" type="submit">Create agent connection →</button></div></form>`,
   );
   $("#enroll-form").onsubmit = (e) => {
     e.preventDefault();
@@ -306,7 +348,7 @@ function setup(step = 1, selected = "gitea") {
   const c = data.connections.find((c) => c.id === selected);
   modal(
     "A little setup. A clear connection.",
-    `<div class="steps"><span class="${step === 1 ? "current" : ""}">01 Choose</span><span class="${step === 2 ? "current" : ""}">02 Review</span><span class="${step === 3 ? "current" : ""}">03 Connect</span></div>${step === 1 ? `<p class="modal-copy">Start with an integration approved for this installation. Credentials and endpoints are configured privately by the service administrator.</p><div class="service-options">${data.connections.map((s) => `<button class="service-option ${s.id === selected ? "selected" : ""}" data-select="${s.id}"><span class="service-icon ${s.id}">${icons[s.id]}</span><span><strong>${esc(s.name)}</strong><small>${s.mode === "personal" ? "Connect your own account" : "Use the approved shared connection"}</small></span><span>→</span></button>`).join("")}</div><div class="notice">UniFi and custom integrations are planned. This preview enables only the two reviewed service definitions.</div>` : step === 2 ? `<p class="modal-copy">You’re setting up <strong>${esc(c.name)}</strong>. Here is exactly what this connection will offer.</p><div class="review-box"><span class="tag">${c.mode.toUpperCase()} CONNECTION</span><h3>${c.mode === "personal" ? "Your account, your permissions." : "A shared credential, clearly labeled."}</h3><p>${esc(c.description)}</p><ul><li>Only the listed read tools are exposed.</li><li>Each agent needs a separate, explicit grant.</li><li>${c.mode === "personal" ? "You approve access on Gitea’s own consent screen." : "The upstream service sees the shared token owner."}</li></ul></div>` : `<p class="modal-copy">${c.mode === "personal" ? "Open the provider’s sign-in page, review the read scopes, and return here to verify your account." : "The shared credential is already configured on the server. Run a check to confirm that the service is reachable."}</p><div class="review-box"><h3>${esc(c.name)}</h3><p>${status(c)}</p>${c.mode === "personal" ? '<button class="button primary" data-reconnect>Connect with Gitea ↗</button>' : ""}<button class="button ${c.mode === "shared" ? "primary" : ""}" data-check="${c.id}">Verify connection ↗</button></div><p class="fine">No passwords or upstream tokens are entered into this walkthrough.</p>`}<div class="modal-actions">${step > 1 ? '<button class="button" id="back-step">← Back</button>' : ""}${step < 3 ? '<button class="button primary" id="next-step">Continue →</button>' : '<button class="button" id="finish-setup">Back to switchboard</button>'}</div>`,
+    `<div class="steps"><span class="${step === 1 ? "current" : ""}">01 Choose</span><span class="${step === 2 ? "current" : ""}">02 Review</span><span class="${step === 3 ? "current" : ""}">03 Connect</span></div>${step === 1 ? `<p class="modal-copy">Start with an integration approved for this installation. Credentials and endpoints are configured privately by the service administrator.</p><div class="service-options">${data.connections.map((s) => `<button class="service-option ${s.id === selected ? "selected" : ""}" data-select="${s.id}"><span class="service-icon ${s.id}">${icons[s.id]}</span><span><strong>${esc(s.name)}</strong><small>${s.mode === "personal" ? "Connect your own account" : "Use the approved shared connection"}</small></span><span>→</span></button>`).join("")}</div><div class="notice">UniFi and custom integrations are planned. This preview enables only the two reviewed service definitions.</div>` : step === 2 ? `<p class="modal-copy">You’re setting up <strong>${esc(c.name)}</strong>. Here is exactly what this connection will offer.</p><div class="review-box"><span class="tag">${c.mode.toUpperCase()} CONNECTION</span><h3>${c.mode === "personal" ? "Your account, your permissions." : "A shared credential, clearly labeled."}</h3><p>${esc(c.description)}</p><ul><li>Only the listed read tools are exposed.</li><li>Each agent needs a separate, explicit grant.</li><li>${c.mode === "personal" ? `You authorize your own account on ${esc(c.name)}.` : "The upstream service sees the shared token owner."}</li></ul></div>` : `<p class="modal-copy">${c.mode === "personal" ? "Open the provider’s sign-in page, review the read scopes, and return here to verify your account." : "The shared credential is already configured on the server. Run a check to confirm that the service is reachable."}</p><div class="review-box"><h3>${esc(c.name)}</h3><p>${status(c)}</p>${c.mode === "personal" ? `<button class="button primary" data-reconnect="${c.id}">Sign in with ${esc(c.name)} ↗</button>` : ""}<button class="button ${c.mode === "shared" ? "primary" : ""}" data-check="${c.id}">Verify connection ↗</button></div><p class="fine">No passwords or upstream tokens are entered into this walkthrough.</p>`}<div class="modal-actions">${step > 1 ? '<button class="button" id="back-step">← Back</button>' : ""}${step < 3 ? '<button class="button primary" id="next-step">Continue →</button>' : '<button class="button" id="finish-setup">Back to switchboard</button>'}</div>`,
   );
   document
     .querySelectorAll("[data-select]")
@@ -352,3 +394,42 @@ refresh().catch((e) => {
   renderLogin();
   if (!e.message.includes("Sign in")) toast(e.message, true);
 });
+
+async function reviewAuthorization(rid) {
+  const r = await api("/api/authorizations/" + encodeURIComponent(rid));
+  modal(
+    "Approve this agent connection?",
+    `<p class="eyebrow">POCKET ID SIGN-IN COMPLETE</p><p class="modal-copy"><strong>${esc(r.client_name)}</strong> is requesting access as <strong>${esc(data.user.name)}</strong>. Approve only a connection you started.</p><div class="review-box"><small>MATCH THIS CODE WITH YOUR TERMINAL</small><h3 class="verification-code">${esc(r.verification_code)}</h3><p class="fine">Client names are self-reported. Return address: ${esc(r.redirect_uri)}</p></div><form id="approve-agent"><fieldset><legend>Allowed services</legend>${r.services
+      .map((id) => {
+        const c = data.connections.find((c) => c.id === id);
+        return `<label class="check-card"><input name="services" type="checkbox" value="${id}" ${c.status === "connected" ? "checked" : "disabled"}><span><strong>${esc(c.name)}</strong><small>${c.status === "connected" ? esc(identity(c)) : "Connect your personal account first"}</small></span></label>${c.status !== "connected" ? `<button type="button" class="text-button" data-reconnect="${id}">Sign in with ${esc(c.name)} ↗</button>` : ""}`;
+      })
+      .join(
+        "",
+      )}</fieldset><label>Fixed approval period<select name="days"><option value="30" ${r.days === 30 ? "selected" : ""}>30 days</option>${r.days === 90 ? '<option value="90" selected>90 days (default)</option>' : ""}</select></label><p class="fine">Only approved read tools are available. Browser logout does not interrupt this connection. At expiry, you must approve again.</p><div class="modal-actions"><button class="button primary" type="submit">Approve connection</button><button class="button" type="button" id="deny-agent">Deny</button></div></form>`,
+    true,
+  );
+  const decide = (approve, form) =>
+    run(async () => {
+      const services = form ? new FormData(form).getAll("services") : [];
+      if (approve && !services.length)
+        return toast("Choose at least one connected service.", true);
+      const result = await api(
+        "/api/authorizations/" + encodeURIComponent(rid),
+        {
+          method: "POST",
+          body: JSON.stringify({
+            approve,
+            services,
+            days: form ? Number(new FormData(form).get("days")) : r.days,
+          }),
+        },
+      );
+      location.assign(result.redirect_url);
+    });
+  $("#approve-agent").onsubmit = (e) => {
+    e.preventDefault();
+    decide(true, e.target);
+  };
+  $("#deny-agent").onclick = () => decide(false);
+}
